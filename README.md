@@ -1,98 +1,72 @@
-# LLM Code Analyzer
+# Code Council
+ 
+ Code Council — see how frontier models reason about your code.
 
-An advanced AI-powered code analysis tool with support for multiple models, multimodal analysis (code and images), and a modern Streamlit web interface.
+## Hero Screenshot
 
-## Features
+Add a dark Council View screenshot here once the new frontend is running locally or deployed.
 
-- **Multi-Model Support**: OpenAI GPT-4, Anthropic Claude, DeepSeek, Mercury, and Google Gemini.
-- **Multimodal Analysis**: Analyze code snippets and images together to get a comprehensive understanding of your code.
-- **Web Interface**: A user-friendly Streamlit web application for easy interaction.
-- **RAG Integration**: Context-aware code suggestions using your codebase.
-- **Advanced Analysis**: Security, performance, and framework-specific analysis.
+## What this is
 
-## Quick Start
+Code Council is a multi-model code analysis sandbox. Instead of one AI verdict, it lets you stream several model opinions over the same code and compare where they agree, disagree, or miss things entirely.
 
-### 1. Clone the Repository
+## Why this exists
+
+Most code-review AI products optimize for a single fast answer during PR time. That is useful, but it hides one of the most interesting parts of working with models: they often notice different risks, emphasize different tradeoffs, and disagree in ways that are actually informative.
+
+Code Council turns that disagreement into the product. The point is not to auto-merge fixes or replace engineering judgment. The point is to give you a place to inspect how multiple frontier models think about the same snippet, with streamed output, consensus signals, static scans, and multimodal input.
+
+## Stack
+
+- Next.js 15
+- FastAPI
+- Railway
+- Vercel
+- Gemini
+- DeepSeek
+- Mercury
+- Kimi
+
+## Run locally
+
 ```bash
 git clone <repository-url>
 cd llm-code-analyzer
+docker compose up
 ```
 
-### 2. Install Dependencies
-```bash
-pip install -r requirements.txt
-```
+Create a root `.env` file before starting local services.
 
-### 3. Set Up API Keys
-Create a `.env` file in the root of the project and add your API keys:
+Required variables:
+
 ```env
-# Required for OpenAI models (GPT-4, GPT-3.5)
-OPENAI_API_KEY=sk-...
-
-# Required for Anthropic Claude models
-ANTHROPIC_API_KEY=sk-ant-...
-
-# Required for DeepSeek models
-DEEPSEEK_API_KEY=sk-...
-
-# Required for Mercury models
-MERCURY_API_KEY=sk_...
-
-# Required for Google Gemini models
-GEMINI_API_KEY=AIza...
+GEMINI_API_KEY=
+DEEPSEEK_API_KEY=
+MERCURY_API_KEY=
+Kimi_API_KEY=
+ALLOWED_ORIGINS=http://localhost:3000
+NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
-### 4. Run the Application
-```bash
-streamlit run code_analyzer/web/app.py
-```
-Then open the provided URL in your browser.
+## Deploy
 
-## Deployment
+Deploy this as two services:
 
-### Render
-The application is configured for easy deployment to Render. Simply connect your GitHub repository to Render and create a new Web Service. Render will automatically detect the `render.yaml` file and configure the service for you.
+- `apps/api` -> Railway
+- `apps/web` -> Vercel
 
-You will need to add your API keys as environment variables in the Render dashboard.
+The Vercel frontend needs the Railway backend URL in `NEXT_PUBLIC_API_URL`. The Railway backend needs the Vercel frontend origin in `ALLOWED_ORIGINS`; use `ALLOWED_ORIGIN_REGEX=https://.*\.vercel\.app` if you want Vercel preview deployments to work.
 
-### Docker
-You can also build and run the application using Docker:
-```bash
-docker build -t llm-code-analyzer .
-docker run -p 8501:8501 -e OPENAI_API_KEY=your_key -e ANTHROPIC_API_KEY=your_key -e DEEPSEEK_API_KEY=your_key -e MERCURY_API_KEY=your_key -e GEMINI_API_KEY=your_key llm-code-analyzer
-```
+See [`DEPLOYMENT.md`](DEPLOYMENT.md) for the full checklist.
 
-## Project Structure
-```
-llm-code-analyzer/
-├── code_analyzer/          # Main application package
-│   ├── web/               # Streamlit web interface
-│   │   └── app.py         # The main Streamlit application
-│   ├── advanced_analyzer.py # Advanced analysis features
-│   ├── multimodal_analyzer.py # Multimodal analysis features
-│   └── ...
-├── requirements.txt       # Dependencies
-├── .env                   # Environment variables (not committed)
-├── Dockerfile             # Docker configuration
-├── render.yaml            # Render deployment configuration
-└── README.md              # This file
-```
+## Architecture
 
-## Troubleshooting
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-### Common Issues
+## What's in `/legacy`
 
-1. **Missing API Keys**: Make sure you have created a `.env` file and added all the required API keys.
-2. **Import Errors**: Ensure you have installed all the dependencies from `requirements.txt`.
-3. **Port Conflicts**: If the default port (8501) is in use, you can run the application on a different port:
-   ```bash
-   streamlit run code_analyzer/web/app.py --server.port <your_port>
-   ```
+The `legacy/` directory preserves earlier iterations of the project: the original Streamlit UI, dashboard work, CI/CD tooling, and other analyzer experiments that helped shape the current product. They are intentionally kept as portfolio evidence, but they are not part of the active runtime.
 
 ## License
 
-[Add your license information here]
-
-## Contributing
-
-[Add contribution guidelines here]
+MIT
