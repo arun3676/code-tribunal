@@ -26,7 +26,7 @@ MODEL_REGISTRY: tuple[ModelDescriptor, ...] = (
     ModelDescriptor(
         id="gemini-2.5-flash",
         provider="gemini",
-        display="Gemini 2.5 Flash",
+        display="Gemini",
         color="#4285F4",
         env_var="GEMINI_API_KEY",
         vision=True,
@@ -34,7 +34,7 @@ MODEL_REGISTRY: tuple[ModelDescriptor, ...] = (
     ModelDescriptor(
         id="deepseek-chat",
         provider="deepseek",
-        display="DeepSeek V3",
+        display="DeepSeek",
         color="#00FF66",
         env_var="DEEPSEEK_API_KEY",
         base_url="https://api.deepseek.com",
@@ -42,7 +42,7 @@ MODEL_REGISTRY: tuple[ModelDescriptor, ...] = (
     ModelDescriptor(
         id="mercury-coder-small",
         provider="mercury",
-        display="Mercury Small",
+        display="Mercury",
         color="#FF8A65",
         env_var="MERCURY_API_KEY",
         base_url="https://api.inceptionlabs.ai/v1",
@@ -50,7 +50,7 @@ MODEL_REGISTRY: tuple[ModelDescriptor, ...] = (
     ModelDescriptor(
         id="moonshot-v1-8k",
         provider="kimi",
-        display="Kimi v1-8k",
+        display="Kimi",
         color="#9C27B0",
         env_var="Kimi_API_KEY",
         base_url="https://api.moonshot.ai/v1",

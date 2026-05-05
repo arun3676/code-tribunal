@@ -45,7 +45,7 @@ export default function AboutPage() {
           <li>· Next.js 15 + Tailwind</li>
           <li>· FastAPI + SSE streaming</li>
           <li>· Vercel + Railway</li>
-          <li>· Gemini 2.5 Flash, DeepSeek V3, Mercury, Kimi</li>
+          <li>· Gemini, DeepSeek, Mercury, Kimi</li>
         </ul>
       </section>
 
