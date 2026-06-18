@@ -21,7 +21,7 @@ Band-powered intent-conformance review for AI-generated code. Code Council strea
 
 Multi-agent Band room: CLERK, ADVOCATE, SURVEYOR, GHOST, DRIFT, WARDEN, ARBITER → merge verdict + trust score + ledger.
 
-→ [`docs/hackathon/plan.md`](docs/hackathon/plan.md) · [`docs/hackathon/goal.md`](docs/hackathon/goal.md)
+→ [`docs/hackathon/plan.md`](docs/hackathon/plan.md) · [`docs/hackathon/goal.md`](docs/hackathon/goal.md) · [`docs/LLM_CONTEXT.md`](docs/LLM_CONTEXT.md) *(upload to ChatGPT/Claude for full context)*
 
 ## Stack
 

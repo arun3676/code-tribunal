@@ -20,6 +20,7 @@ code-tribunal-lab-lab/
 │       ├── src/components/
 │       └── src/lib/api.ts
 ├── docs/
+│   ├── LLM_CONTEXT.md          # Upload to any LLM for full product context
 │   ├── ARCHITECTURE.md
 │   ├── STRUCTURE.md
 │   ├── tribunal-explainer.html # Judge-facing case file / pitch
