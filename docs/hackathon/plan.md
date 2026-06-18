@@ -3,7 +3,7 @@
 > **Goal doc:** [`goal.md`](./goal.md)  
 > **Time budget:** One day (build + deploy + video + submit)  
 > **Repo root:** `code-tribunal-lab-lab/`  
-> **Reference:** Full 7-day phased spec lives in parent workspace `CODE_COUNCIL_TRIBUNAL_BUILD.md` — use for narrative, not 1-day scope
+> **Reference:** Full phased spec: [`BUILD.md`](./BUILD.md)
 
 ---
 
