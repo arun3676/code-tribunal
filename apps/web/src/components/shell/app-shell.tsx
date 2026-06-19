@@ -1,17 +1,13 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import Link from "next/link";
 import type { Route } from "next";
 import { PropsWithChildren, useEffect, useMemo, useState } from "react";
 
 import { getHealth, getModels, type ModelInfo } from "@/lib/api";
 
-const MatrixRain = dynamic(() => import("@/components/effects/matrix-rain").then((mod) => mod.MatrixRain), { ssr: false });
-
 export function AppShell({ children }: PropsWithChildren) {
   const [models, setModels] = useState<ModelInfo[]>([]);
-  const [status, setStatus] = useState("ready");
   const [online, setOnline] = useState(true);
 
   useEffect(() => {
@@ -23,42 +19,42 @@ export function AppShell({ children }: PropsWithChildren) {
     };
     checkHealth();
     const interval = window.setInterval(checkHealth, 5000);
-    const onStatus = (event: Event) => {
-      const custom = event as CustomEvent<string>;
-      if (custom.detail) {
-        setStatus(custom.detail);
-      }
-    };
-    window.addEventListener("code-council-status", onStatus as EventListener);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("code-council-status", onStatus as EventListener);
-    };
+    return () => window.clearInterval(interval);
   }, []);
 
   const availability = useMemo(() => models.filter((model) => model.available), [models]);
 
   return (
-    <div className="min-h-screen bg-bg text-fg">
-      <MatrixRain />
-      <header className="sticky top-0 z-20 border-b border-[color:var(--border)] bg-[rgba(5,8,5,0.82)] backdrop-blur">
-        <div className="mx-auto flex h-12 max-w-7xl items-center justify-between px-2 sm:px-4">
-          <Link href="/" className="font-mono text-xs tracking-[0.18em] text-fg sm:text-sm sm:tracking-[0.24em]">
-            CODE_COUNCIL<span className="animate-pulse text-accent">_</span>
-          </Link>
+    <div className="flex h-screen flex-col overflow-hidden text-fg">
+      <header className="shrink-0 z-20 border-b-[2.5px] border-[color:var(--ink)] bg-[color:var(--bg-overlay)]">
+        <div className="flex h-12 w-full items-center justify-between px-5">
+          <div className="flex items-center gap-3">
+            <Link href="/" className="font-mono text-sm font-bold tracking-[0.24em] text-fg">
+              CODE_COUNCIL<span className="animate-pulse">_</span>
+            </Link>
+            <Link
+              href={"/tribunal" as Route}
+              className="btn-tactile rounded-lg border-2 border-[color:var(--ink)] bg-[color:var(--arbiter)] px-2.5 py-1 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--ink)]"
+            >
+              Tribunal
+            </Link>
+          </div>
           <div className="flex items-center gap-2">
             {models.map((model) => (
-              <div key={model.id} title={model.display} className="h-2.5 w-2.5 rounded-full border border-black/20" style={{ backgroundColor: model.available ? model.color : "#253128" }} />
+              <div
+                key={model.id}
+                title={model.display}
+                className="h-3 w-3 rounded-full border-2 border-[color:var(--ink)]"
+                style={{ backgroundColor: model.available ? model.color : "transparent" }}
+              />
             ))}
-            {availability.length === 0 ? <span className="font-mono text-[11px] text-danger">BACKEND_OFFLINE</span> : null}
+            {availability.length === 0 && !online ? (
+              <span className="font-mono text-[11px] font-bold text-danger">OFFLINE</span>
+            ) : null}
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-4 pb-16 pt-5">{children}</main>
-      <div className="fixed bottom-0 left-0 right-0 z-20 flex items-center justify-between gap-3 border-t border-[color:var(--border)] bg-[rgba(10,15,10,0.92)] px-2 py-2 font-mono text-[11px] uppercase tracking-[0.18em] text-fg-muted sm:px-4">
-        <span className="truncate">{online ? status : "BACKEND_OFFLINE"}</span>
-        <Link href={"/about" as Route} className="shrink-0 text-fg-muted hover:text-accent">about</Link>
-      </div>
+      <main className="min-h-0 flex-1 overflow-hidden px-4 py-3">{children}</main>
     </div>
   );
 }

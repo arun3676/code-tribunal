@@ -42,6 +42,48 @@ export type StreamEvent = {
   data: any;
 };
 
+// --- Tribunal ---------------------------------------------------------------
+
+export type AgentName = "CLERK" | "ADVOCATE" | "SURVEYOR" | "GHOST" | "DRIFT" | "WARDEN" | "ARBITER";
+
+export type AgentMeta = {
+  name: AgentName;
+  role: string;
+  provider: string;
+  color: string;
+  summary: string;
+  recruited: boolean;
+};
+
+export type TribunalEventType = "phase" | "message" | "event" | "recruitment" | "verdict" | "done" | "error";
+
+export type TribunalEvent = {
+  type: TribunalEventType;
+  agent?: AgentName | null;
+  target?: AgentName[] | null;
+  text: string;
+  payload: Record<string, any>;
+};
+
+export type Verdict = {
+  state: "CONFORMS" | "CONFORMS_WITH_CONDITIONS" | "DOES_NOT_CONFORM";
+  trust_score: number;
+  merge_decision: "APPROVE" | "APPROVE_WITH_CONDITIONS" | "BLOCK";
+  blockers: string[];
+  conditions: string[];
+  ledger: Array<{ requirement_id: string; requirement: string; code_refs: string[]; decision: string; notes: string }>;
+  deductions: Array<{ reason: string; points: number }>;
+  summary: string;
+};
+
+export type TribunalFixture = {
+  id: string;
+  title: string;
+  ticket: string;
+  diff: string;
+  touched_domains: string[];
+};
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -125,6 +167,20 @@ export function council(payload: { code: string; language?: string; models: stri
 
 export function scan(payload: { code: string; language?: string }) {
   return request<ScanResult>("/scan", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function getTribunalFixtures() {
+  return request<TribunalFixture[]>("/tribunal/fixtures", { method: "GET" });
+}
+
+export async function* tribunal(
+  payload: { fixture_id?: string; title?: string; ticket?: string; diff?: string; touched_domains?: string[] },
+  signal?: AbortSignal,
+): AsyncGenerator<TribunalEvent> {
+  for await (const frame of streamSse("/tribunal/run", payload, signal)) {
+    // Each SSE frame's data is a full TribunalEvent (its `type` mirrors the event name).
+    yield frame.data as TribunalEvent;
+  }
 }
 
 export async function multimodal(payload: { file: File; prompt?: string; model?: string }) {

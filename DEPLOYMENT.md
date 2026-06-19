@@ -1,71 +1,108 @@
 # Deployment
 
-Code Council deploys as two services:
+Code Council Tribunal deploys as two services:
 
-- Frontend: `apps/web` on Vercel.
-- Backend API: `apps/api` on Railway.
+- **Frontend:** `apps/web` on Vercel
+- **Backend API:** `apps/api` on Railway
 
-The frontend needs the backend. It calls `/health`, `/models`, `/analyze`, `/council`, `/scan`, and `/multimodal`.
+The frontend calls `/health`, `/tribunal/fixtures`, `/tribunal/run`, plus Solo/Council routes.
 
 ## 1. Deploy API on Railway
 
-Create a Railway service from this repository with root directory:
+Railway service root directory:
 
 ```text
 apps/api
 ```
 
-Railway should use the Dockerfile in `apps/api`. The container listens on `0.0.0.0:$PORT`; Railway injects `PORT` automatically.
+Start command (default from Dockerfile):
 
-Set these Railway environment variables:
+```bash
+uvicorn code_council.server:app --host 0.0.0.0 --port $PORT --workers 1
+```
+
+### Railway environment variables
 
 ```env
-GEMINI_API_KEY=...
-DEEPSEEK_API_KEY=...
-MERCURY_API_KEY=...
-Kimi_API_KEY=...
-ALLOWED_ORIGINS=https://your-vercel-app.vercel.app
+GEMINI_API_KEY=
+DEEPSEEK_API_KEY=
+MERCURY_API_KEY=
+Kimi_API_KEY=
+
+BAND_ENABLED=true
+BAND_STRICT=true
+BAND_API_KEY=
+BAND_BASE_URL=https://app.band.ai/api/v1
+BAND_CLERK_ID=
+BAND_ADVOCATE_ID=
+BAND_SURVEYOR_ID=
+BAND_GHOST_ID=
+BAND_DRIFT_ID=
+BAND_WARDEN_ID=
+BAND_ARBITER_ID=
+
+# Optional — messages appear from each agent identity
+BAND_CLERK_API_KEY=
+BAND_ADVOCATE_API_KEY=
+BAND_SURVEYOR_API_KEY=
+BAND_GHOST_API_KEY=
+BAND_DRIFT_API_KEY=
+BAND_WARDEN_API_KEY=
+BAND_ARBITER_API_KEY=
+
+FEATHERLESS_API_KEY=
+AIMLAPI_API_KEY=
+
+ALLOWED_ORIGINS=https://YOUR-VERCEL-DOMAIN.vercel.app
 ALLOWED_ORIGIN_REGEX=https://.*\.vercel\.app
 ```
 
-After Railway deploys, verify:
+### Pre-deploy smoke test (local)
 
 ```bash
-curl https://your-railway-domain.up.railway.app/health
-curl https://your-railway-domain.up.railway.app/models
+python scripts/check_env_keys.py
+python scripts/verify_band_trial.py
 ```
+
+### Post-deploy verify
+
+```bash
+curl https://YOUR-RAILWAY-API/health
+curl https://YOUR-RAILWAY-API/tribunal/fixtures
+curl -N -X POST https://YOUR-RAILWAY-API/tribunal/run \
+  -H "Content-Type: application/json" \
+  -d '{"fixture_id":"auth-login-001"}'
+```
+
+Confirm a new Band chat room appears at [app.band.ai](https://app.band.ai).
 
 ## 2. Deploy Web on Vercel
 
-Create a Vercel project from this repository with root directory:
+Vercel project root directory:
 
 ```text
 apps/web
 ```
 
-Set this Vercel environment variable before building:
+Environment variable:
 
 ```env
-NEXT_PUBLIC_API_URL=https://your-railway-domain.up.railway.app
+NEXT_PUBLIC_API_URL=https://YOUR-RAILWAY-API
 ```
-
-Use the default Next.js output. The app includes `apps/web/vercel.json` with the install and build commands.
 
 ## 3. Connect CORS
 
-Once the final Vercel production URL is known, update Railway:
+After Vercel deploy, set Railway `ALLOWED_ORIGINS` to your production Vercel URL. Keep `ALLOWED_ORIGIN_REGEX` for preview deployments.
 
-```env
-ALLOWED_ORIGINS=https://your-vercel-app.vercel.app,https://your-custom-domain.com
-```
+## 4. Production smoke test
 
-Keep `ALLOWED_ORIGIN_REGEX=https://.*\.vercel\.app` if you want Vercel preview deployments to call the Railway API.
+Open `https://YOUR-VERCEL-APP/tribunal`:
 
-## 4. Smoke Test
-
-Open the deployed Vercel URL and confirm:
-
-- Header does not show `BACKEND_OFFLINE`.
-- All four model indicators are visible.
-- Solo analysis returns a score, bugs, suggestions, and raw stream.
-- Council analysis completes with all four models and no `MODEL UNRESPONSIVE` cards.
+- [ ] Page loads (no `BACKEND_OFFLINE`)
+- [ ] Load **auth-login-001** → **Convene Tribunal**
+- [ ] GHOST flags R3 (rate limiting missing)
+- [ ] DRIFT flags auth middleware change
+- [ ] WARDEN recruited
+- [ ] Verdict: DOES_NOT_CONFORM, BLOCK
+- [ ] Band room created (side-by-side check)
+- [ ] No CORS or mixed-content errors

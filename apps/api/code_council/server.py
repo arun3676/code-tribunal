@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import time
 from collections import defaultdict, deque
 from pathlib import Path
@@ -17,15 +18,21 @@ from sse_starlette.sse import EventSourceResponse
 
 from .analyzer import Analyzer
 from .fixes import FixSuggestionGenerator
+from .github_webhook import router as github_router
 from .multimodal import MultiModalAnalyzer
 from .scanners.performance import PerformanceAnalyzer
 from .scanners.security import SecurityAnalyzer
+from .tribunal.fixtures import get_fixture, list_fixtures
+from .tribunal.headless import build_adhoc_docket, run_trial_collect, summarize_verdict
+from .tribunal.protocol import Docket, IntentSource
+from .tribunal.runner import run_trial
 from .utils import chunk_text_for_sse, get_git_sha, parse_llm_response
 
 logger = logging.getLogger("code_council")
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="Code Council API", version="0.1.0")
+app.include_router(github_router)
 
 
 def _allowed_origins() -> list[str]:
@@ -81,6 +88,14 @@ class CouncilRequest(BaseModel):
 class ScanRequest(BaseModel):
     code: str = Field(min_length=1)
     language: str | None = None
+
+
+class TribunalRequest(BaseModel):
+    fixture_id: str | None = None
+    title: str | None = None
+    ticket: str | None = None
+    diff: str | None = None
+    touched_domains: list[str] = Field(default_factory=list)
 
 
 @app.on_event("startup")
@@ -236,6 +251,73 @@ async def council(payload: CouncilRequest):
         yield {"event": "all_done", "data": json.dumps({"total_duration_ms": round((time.perf_counter() - started_at) * 1000, 2)})}
 
     return EventSourceResponse(event_stream())
+
+
+def _detect_domains(diff: str, declared: list[str]) -> list[str]:
+    domains = set(d.strip().lower() for d in declared if d.strip())
+    text = diff.lower()
+    if any(k in text for k in ("login", "auth", "password", "token", "session")):
+        domains.add("auth")
+    if any(k in text for k in ("bcrypt", "crypto", "secret", "middleware", "permission")):
+        domains.add("security")
+    return sorted(domains)
+
+
+@app.get("/tribunal/fixtures")
+async def tribunal_fixtures() -> list[dict]:
+    return list_fixtures()
+
+
+@app.post("/tribunal/run")
+async def tribunal_run(payload: TribunalRequest):
+    if payload.fixture_id:
+        docket = get_fixture(payload.fixture_id)
+        if docket is None:
+            raise HTTPException(status_code=404, detail=f"Unknown fixture: {payload.fixture_id}")
+    else:
+        if not payload.ticket or not payload.diff:
+            raise HTTPException(status_code=400, detail="Provide fixture_id, or both ticket and diff.")
+        files = sorted({m for m in re.findall(r"[+]{3}\s+b/(\S+)", payload.diff)})
+        docket = Docket(
+            trial_id=f"adhoc-{int(time.time())}",
+            title=payload.title or "Ad-hoc tribunal",
+            intent_sources=[IntentSource(source_ref="custom", title="Ticket", text=payload.ticket)],
+            diff=payload.diff,
+            touched_files=files,
+            touched_domains=_detect_domains(payload.diff, payload.touched_domains),
+        )
+
+    async def event_stream() -> AsyncIterator[dict[str, str]]:
+        try:
+            async for event in run_trial(docket):
+                yield {"event": event.type, "data": event.model_dump_json()}
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.exception("tribunal run failed")
+            yield {"event": "error", "data": json.dumps({"message": str(exc)})}
+
+    return EventSourceResponse(event_stream())
+
+
+@app.post("/tribunal/verdict")
+async def tribunal_verdict(payload: TribunalRequest) -> dict:
+    """Headless (non-streaming) trial — returns the final verdict as JSON.
+
+    This is the programmatic entrypoint for coding agents / CI / MCP: same
+    court, same Band mirroring and WARDEN recruitment as ``/tribunal/run``, but
+    one JSON response instead of an SSE stream.
+    """
+    if payload.fixture_id:
+        docket = get_fixture(payload.fixture_id)
+        if docket is None:
+            raise HTTPException(status_code=404, detail=f"Unknown fixture: {payload.fixture_id}")
+    else:
+        if not payload.ticket or not payload.diff:
+            raise HTTPException(status_code=400, detail="Provide fixture_id, or both ticket and diff.")
+        docket = build_adhoc_docket(payload.ticket, payload.diff, payload.touched_domains, payload.title)
+
+    result = await run_trial_collect(docket)
+    result["headline"] = summarize_verdict(result.get("verdict"))
+    return result
 
 
 @app.post("/multimodal")
