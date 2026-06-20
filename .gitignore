@@ -21,6 +21,9 @@ dist/
 .env.*
 !.env.example
 
+# Local-only internal docs (e.g. Band migration plan) — never published
+docs/internal/
+
 # Node / frontend
 node_modules/
 .next/

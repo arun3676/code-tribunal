@@ -4,10 +4,14 @@ from __future__ import annotations
 from pathlib import Path
 
 KEYS = [
+    "GROQ_API_KEY",
+    "CEREBRAS_API_KEY",
     "GEMINI_API_KEY",
+    "TRIBUNAL_LLM_PROVIDERS",
     "DEEPSEEK_API_KEY",
     "MERCURY_API_KEY",
     "Kimi_API_KEY",
+    "COORDINATION_BACKEND",
     "BAND_ENABLED",
     "BAND_STRICT",
     "BAND_API_KEY",
@@ -19,8 +23,6 @@ KEYS = [
     "BAND_DRIFT_ID",
     "BAND_WARDEN_ID",
     "BAND_ARBITER_ID",
-    "AIMLAPI_API_KEY",
-    "FEATHERLESS_API_KEY",
     "ALLOWED_ORIGINS",
     "NEXT_PUBLIC_API_URL",
 ]

@@ -1,6 +1,6 @@
 # Deployment
 
-Code Council Tribunal deploys as two services:
+Code Tribunal deploys as two services:
 
 - **Frontend:** `apps/web` on Vercel
 - **Backend API:** `apps/api` on Railway
@@ -24,11 +24,16 @@ uvicorn code_council.server:app --host 0.0.0.0 --port $PORT --workers 1
 ### Railway environment variables
 
 ```env
+GROQ_API_KEY=
+CEREBRAS_API_KEY=
 GEMINI_API_KEY=
+TRIBUNAL_LLM_PROVIDERS=groq,cerebras,gemini
+
 DEEPSEEK_API_KEY=
 MERCURY_API_KEY=
 Kimi_API_KEY=
 
+COORDINATION_BACKEND=band
 BAND_ENABLED=true
 BAND_STRICT=true
 BAND_API_KEY=
@@ -49,9 +54,6 @@ BAND_GHOST_API_KEY=
 BAND_DRIFT_API_KEY=
 BAND_WARDEN_API_KEY=
 BAND_ARBITER_API_KEY=
-
-FEATHERLESS_API_KEY=
-AIMLAPI_API_KEY=
 
 ALLOWED_ORIGINS=https://YOUR-VERCEL-DOMAIN.vercel.app
 ALLOWED_ORIGIN_REGEX=https://.*\.vercel\.app

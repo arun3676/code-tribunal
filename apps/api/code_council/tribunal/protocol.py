@@ -47,28 +47,28 @@ AGENTS: dict[str, AgentMeta] = {
     "ADVOCATE": AgentMeta(
         name="ADVOCATE",
         role="Intent Witness",
-        provider="AI/ML API",
+        provider="Groq",
         color="#ffaa44",
         summary="Extracts the requirement checklist from the ticket.",
     ),
     "SURVEYOR": AgentMeta(
         name="SURVEYOR",
         role="Implementation Witness",
-        provider="Code Council",
+        provider="Groq",
         color="#00ff66",
         summary="Inspects what the diff actually changed.",
     ),
     "GHOST": AgentMeta(
         name="GHOST",
         role="Omission Auditor",
-        provider="AI/ML API",
+        provider="Groq",
         color="#c3c6e0",
         summary="Finds requested work that is absent — negative space.",
     ),
     "DRIFT": AgentMeta(
         name="DRIFT",
         role="Scope Auditor",
-        provider="Featherless",
+        provider="Cerebras",
         color="#b07cff",
         summary="Finds changes no requirement authorized.",
     ),
@@ -83,7 +83,7 @@ AGENTS: dict[str, AgentMeta] = {
     "ARBITER": AgentMeta(
         name="ARBITER",
         role="Judge",
-        provider="AI/ML API",
+        provider="Groq",
         color="#f5c542",
         summary="Issues the verdict, trust score, and traceability ledger.",
     ),
@@ -106,6 +106,10 @@ class Docket(BaseModel):
     diff: str = ""
     touched_files: list[str] = Field(default_factory=list)
     touched_domains: list[str] = Field(default_factory=list)
+    # "auto"/"llm" use the LLM agents (deterministic fallback if no provider);
+    # "deterministic" pins the regex engine — used by demo fixtures for stable
+    # landing-page verdicts.
+    engine: Literal["auto", "deterministic", "llm"] = "auto"
 
 
 # --- Findings (mid-trial) ---------------------------------------------------

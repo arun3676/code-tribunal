@@ -13,7 +13,7 @@ export default function AboutPage() {
           ← back
         </Link>
         <h1 className="mt-4 font-mono text-2xl uppercase tracking-[0.16em] text-accent">Code Council Tribunal</h1>
-        <p className="mt-2 text-sm text-fg-muted">Multi-model analysis today. Band-powered intent review next.</p>
+        <p className="mt-2 text-sm text-fg-muted">Multi-model analysis in the browser. Band-coordinated intent review in your coding agent.</p>
       </header>
 
       <section className="space-y-3">
@@ -40,10 +40,12 @@ export default function AboutPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-fg-muted">Tribunal (in build)</h2>
+        <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-fg-muted">Tribunal</h2>
         <p className="text-sm leading-relaxed text-fg">
-          Tribunal puts AI-generated diffs on trial: Band-connected agents compare the ticket against the
+          Tribunal puts AI-generated diffs on trial: Band-coordinated agents compare the ticket against the
           implementation, catch omissions and scope drift, and issue a merge verdict with a traceability ledger.
+          It runs in the browser as a demo and ships as a CLI and MCP server you can wire into Claude Code,
+          Codex, or Cursor to gate real pull requests.
         </p>
       </section>
 
@@ -52,14 +54,14 @@ export default function AboutPage() {
         <ul className="grid gap-1 text-sm text-fg-muted sm:grid-cols-2">
           <li>· Next.js 15 + Tailwind</li>
           <li>· FastAPI + SSE streaming</li>
-          <li>· Vercel + Railway</li>
-          <li>· Gemini, DeepSeek, Mercury, Kimi</li>
+          <li>· CLI + MCP server (uvx)</li>
+          <li>· Groq, Cerebras, Gemini · coordinated over Band</li>
         </ul>
       </section>
 
       <footer className="border-t border-[color:var(--border)] pt-4">
         <a
-          href="https://github.com/arun3676/code-tribunal-lab-lab"
+          href="https://github.com/arun3676/code-tribunal"
           className="font-mono text-xs uppercase tracking-[0.2em] text-fg-muted hover:text-accent"
         >
           source on github →

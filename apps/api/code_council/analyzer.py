@@ -22,7 +22,36 @@ except ImportError:  # pragma: no cover
 load_dotenv()
 
 
+_GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+_CEREBRAS_BASE_URL = "https://api.cerebras.ai/v1"
+
+
 MODEL_REGISTRY: tuple[ModelDescriptor, ...] = (
+    # --- Free, OpenAI-compatible providers (council default lineup) ---
+    ModelDescriptor(
+        id="llama-3.3-70b-versatile",
+        provider="groq",
+        display="Llama 3.3 70B",
+        color="#F55036",
+        env_var="GROQ_API_KEY",
+        base_url=_GROQ_BASE_URL,
+    ),
+    ModelDescriptor(
+        id="openai/gpt-oss-120b",
+        provider="groq",
+        display="GPT-OSS 120B",
+        color="#10A37F",
+        env_var="GROQ_API_KEY",
+        base_url=_GROQ_BASE_URL,
+    ),
+    ModelDescriptor(
+        id="llama-3.3-70b",
+        provider="cerebras",
+        display="Cerebras Llama",
+        color="#F58220",
+        env_var="CEREBRAS_API_KEY",
+        base_url=_CEREBRAS_BASE_URL,
+    ),
     ModelDescriptor(
         id="gemini-2.5-flash",
         provider="gemini",
@@ -31,6 +60,15 @@ MODEL_REGISTRY: tuple[ModelDescriptor, ...] = (
         env_var="GEMINI_API_KEY",
         vision=True,
     ),
+    ModelDescriptor(
+        id="moonshotai/kimi-k2-instruct",
+        provider="groq",
+        display="Kimi K2",
+        color="#7C3AED",
+        env_var="GROQ_API_KEY",
+        base_url=_GROQ_BASE_URL,
+    ),
+    # --- Optional legacy providers (only surface when a key is present) ---
     ModelDescriptor(
         id="deepseek-chat",
         provider="deepseek",

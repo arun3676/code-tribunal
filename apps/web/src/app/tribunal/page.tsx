@@ -438,7 +438,10 @@ export default function TribunalPage() {
             </div>
           )}
 
-          {/* Sponsor routing badges */}
+          {/* Install — CLI / MCP */}
+          <InstallPanel />
+
+          {/* Agent routing badges */}
           <div className="border-t-2 border-[color:var(--ink)] pt-3">
             <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-fg-muted">Agent routing</p>
             <div className="space-y-1">
@@ -570,7 +573,7 @@ function RulingDetails({ verdict, expanded = false }: { verdict: Verdict; expand
 function HowItWorks() {
   const steps = [
     { n: 1, icon: <EvidenceTagIcon size={14} color="var(--advocate)" />, title: "Drop the brief", body: "Paste the ticket you gave the AI, plus the diff it produced." },
-    { n: 2, icon: <ScalesIcon size={14} color="var(--clerk)" />, title: "The chamber debates", body: "7 specialist agents deliberate live over Band — each with one job." },
+    { n: 2, icon: <ScalesIcon size={14} color="var(--clerk)" />, title: "The chamber debates", body: "7 specialist agents deliberate live, coordinated over Band — each with one job." },
     { n: 3, icon: <GavelIcon size={14} color="var(--ink)" />, title: "Get the verdict", body: "A trust score, a merge call, and a ledger of what's missing or unauthorized." },
   ];
   return (
@@ -587,6 +590,45 @@ function HowItWorks() {
             {i < steps.length - 1 ? <span className="shrink-0 text-dim">→</span> : null}
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function InstallPanel() {
+  const mcpSnippet = `{
+  "mcpServers": {
+    "tribunal": {
+      "command": "uvx",
+      "args": ["--from", "code-tribunal", "tribunal-mcp"],
+      "env": { "GROQ_API_KEY": "<your-key>" }
+    }
+  }
+}`;
+  const codexSnippet = `[mcp_servers.tribunal]
+command = "uvx"
+args = ["--from", "code-tribunal", "tribunal-mcp"]
+env = { GROQ_API_KEY = "<your-key>" }`;
+  const cliSnippet = `tribunal verify --ticket ticket.md --diff pr.diff`;
+  return (
+    <div className="border-t-2 border-[color:var(--ink)] pt-3">
+      <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-fg-muted">Install · CLI / MCP</p>
+      <p className="mb-2 text-[11px] leading-snug text-muted">
+        Run the same tribunal from your coding agent or CI — no browser. Bring your own key.
+      </p>
+      <div className="space-y-2">
+        <div>
+          <p className="mb-1 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-fg-dim">Claude Code · Cursor</p>
+          <pre className="overflow-x-auto rounded-lg border-2 border-[color:var(--ink)] bg-[color:var(--bg-overlay)] px-2.5 py-2 font-mono text-[10px] leading-relaxed text-fg">{mcpSnippet}</pre>
+        </div>
+        <div>
+          <p className="mb-1 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-fg-dim">Codex · ~/.codex/config.toml</p>
+          <pre className="overflow-x-auto rounded-lg border-2 border-[color:var(--ink)] bg-[color:var(--bg-overlay)] px-2.5 py-2 font-mono text-[10px] leading-relaxed text-fg">{codexSnippet}</pre>
+        </div>
+        <div>
+          <p className="mb-1 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-fg-dim">CLI · gate a PR in CI</p>
+          <pre className="overflow-x-auto rounded-lg border-2 border-[color:var(--ink)] bg-[color:var(--bg-overlay)] px-2.5 py-2 font-mono text-[10px] leading-relaxed text-fg">{cliSnippet}</pre>
+        </div>
       </div>
     </div>
   );

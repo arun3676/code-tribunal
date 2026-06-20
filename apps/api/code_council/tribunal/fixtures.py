@@ -211,6 +211,7 @@ FIXTURES: list[Docket] = [
             "test/login.test.ts",
         ],
         touched_domains=["auth", "security"],
+        engine="deterministic",
     ),
     Docket(
         trial_id="health-check-002",
@@ -221,6 +222,7 @@ FIXTURES: list[Docket] = [
         diff=_CLEAN_DIFF,
         touched_files=["src/routes/health.ts", "test/health.test.ts"],
         touched_domains=["observability"],
+        engine="deterministic",
     ),
     Docket(
         trial_id="payment-refund-003",
@@ -235,6 +237,7 @@ FIXTURES: list[Docket] = [
             "config/payment-gateway.ts",
         ],
         touched_domains=["payments", "security"],
+        engine="deterministic",
     ),
     Docket(
         trial_id="user-profile-004",
@@ -245,6 +248,7 @@ FIXTURES: list[Docket] = [
         diff=_PROFILE_DIFF,
         touched_files=["src/routes/user.ts", "test/user.test.ts"],
         touched_domains=["users"],
+        engine="deterministic",
     ),
 ]
 

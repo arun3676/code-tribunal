@@ -22,9 +22,10 @@ import re
 import time
 from typing import AsyncIterator
 
-from .band_adapter import BandAdapter, BandError
+from .band_adapter import BandError
+from .coordination import CoordinationBackend, get_coordination_backend
 from .fixtures import get_fixture
-from .providers import call_featherless_json
+from .llm import complete_json
 from .protocol import (
     AGENTS,
     Docket,
@@ -197,6 +198,334 @@ def is_met(req: RequirementItem, signals: dict[str, bool]) -> bool:
     return signals.get(signal, False)
 
 
+# --- LLM-backed agents (deterministic fallback) -----------------------------
+#
+# Each wrapper reasons over an *arbitrary* ticket/diff via the LLM provider
+# chain. When ``docket.engine == "deterministic"`` (demo fixtures) or no
+# provider is configured / the call fails (``complete_json`` returns None), it
+# falls back to the original regex engine so a verdict always lands.
+
+
+def _use_llm(docket: Docket) -> bool:
+    return docket.engine != "deterministic"
+
+
+_ADVOCATE_SCHEMA: dict = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["requirements"],
+    "properties": {
+        "requirements": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["id", "text", "priority"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "text": {"type": "string"},
+                    "priority": {"type": "string", "enum": ["must", "should"]},
+                },
+            },
+        }
+    },
+}
+
+
+def advocate_extract(docket: Docket) -> list[RequirementItem]:
+    """ADVOCATE — turn a free-form ticket into a numbered requirement checklist."""
+    if _use_llm(docket):
+        text = "\n".join(source.text for source in docket.intent_sources)
+        source_ref = docket.intent_sources[0].source_ref if docket.intent_sources else ""
+        data = complete_json(
+            "You are ADVOCATE, an intent witness. Extract an atomic, testable requirement "
+            "checklist from a software ticket. Mark priority 'must' for mandatory items and "
+            "stated constraints, 'should' for optional/nice-to-have. Number ids R1, R2, ...",
+            f"Ticket:\n{text}\n\nReturn JSON {{requirements:[{{id,text,priority}}]}}.",
+            _ADVOCATE_SCHEMA,
+        )
+        if data and isinstance(data.get("requirements"), list):
+            items: list[RequirementItem] = []
+            for i, row in enumerate(data["requirements"], start=1):
+                body = str(row.get("text", "")).strip().rstrip(".")
+                if not body:
+                    continue
+                priority = "should" if str(row.get("priority", "must")).lower() == "should" else "must"
+                items.append(
+                    RequirementItem(
+                        id=str(row.get("id") or f"R{i}").strip(),
+                        text=body,
+                        priority=priority,  # type: ignore[arg-type]
+                        source_ref=source_ref,
+                    )
+                )
+            if items:
+                return items
+    return extract_requirements(docket)
+
+
+_SURVEYOR_SCHEMA: dict = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["findings"],
+    "properties": {
+        "findings": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["summary", "file_ref", "evidence", "kind"],
+                "properties": {
+                    "summary": {"type": "string"},
+                    "file_ref": {"type": "string"},
+                    "evidence": {"type": "string"},
+                    "kind": {"type": "string", "enum": ["added", "changed", "removed"]},
+                },
+            },
+        }
+    },
+}
+
+
+def surveyor_inspect(docket: Docket) -> list[ImplementationFinding]:
+    """SURVEYOR — report what the diff actually changed (facts, no opinions)."""
+    if _use_llm(docket):
+        data = complete_json(
+            "You are SURVEYOR, an implementation witness. Inspect a unified diff and report "
+            "what it actually changed — factual, no opinions. kind='added' for new behaviour, "
+            "'changed' for modified existing behaviour, 'removed' for deletions.",
+            f"Touched files: {', '.join(docket.touched_files)}\n\nDiff:\n{docket.diff}\n\n"
+            "Return JSON {findings:[{summary,file_ref,evidence,kind}]}. evidence is a short snippet.",
+            _SURVEYOR_SCHEMA,
+            max_tokens=1500,
+        )
+        if data and isinstance(data.get("findings"), list):
+            findings: list[ImplementationFinding] = []
+            for i, row in enumerate(data["findings"], start=1):
+                summary = str(row.get("summary", "")).strip()
+                if not summary:
+                    continue
+                kind = str(row.get("kind", "added")).lower()
+                if kind not in ("added", "changed", "removed"):
+                    kind = "added"
+                findings.append(
+                    ImplementationFinding(
+                        id=f"I{i}",
+                        summary=summary,
+                        file_ref=str(row.get("file_ref", "")).strip(),
+                        evidence=str(row.get("evidence", "")).strip(),
+                        kind=kind,  # type: ignore[arg-type]
+                    )
+                )
+            if findings:
+                return findings
+    return survey_implementation(docket, detect_signals(docket.diff))
+
+
+_GHOST_SCHEMA: dict = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["omissions"],
+    "properties": {
+        "omissions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["requirement_id", "severity", "detail"],
+                "properties": {
+                    "requirement_id": {"type": "string"},
+                    "severity": {"type": "string", "enum": ["critical", "high", "medium", "low"]},
+                    "detail": {"type": "string"},
+                },
+            },
+        }
+    },
+}
+
+
+def ghost_omissions(
+    docket: Docket, requirements: list[RequirementItem], impl: list[ImplementationFinding]
+) -> list[Finding]:
+    """GHOST — requirements requested but with no implementing evidence."""
+    if _use_llm(docket) and requirements:
+        req_text = "\n".join(f"{r.id} ({r.priority.upper()}): {r.text}" for r in requirements)
+        impl_text = "\n".join(f"{f.id}: {f.summary} [{f.kind}] {f.file_ref}" for f in impl) or "(none)"
+        data = complete_json(
+            "You are GHOST, an omission auditor. Find requirements that were requested but have "
+            "NO implementing evidence in the diff — the negative space. Only report genuinely "
+            "missing items. severity 'critical' for an unmet MUST, 'medium' for an unmet SHOULD.",
+            f"Requirements:\n{req_text}\n\nImplementation findings:\n{impl_text}\n\nDiff:\n{docket.diff}\n\n"
+            "Return JSON {omissions:[{requirement_id,severity,detail}]}. Empty array if all implemented.",
+            _GHOST_SCHEMA,
+        )
+        if data is not None and isinstance(data.get("omissions"), list):
+            by_id = {r.id: r for r in requirements}
+            findings: list[Finding] = []
+            for row in data["omissions"]:
+                rid = str(row.get("requirement_id", "")).strip()
+                req = by_id.get(rid)
+                if req is None:
+                    continue
+                severity = str(row.get("severity", "")).lower()
+                if severity not in ("critical", "high", "medium", "low"):
+                    severity = "critical" if req.priority == "must" else "medium"
+                findings.append(
+                    Finding(
+                        agent="GHOST",
+                        kind="omission",
+                        severity=severity,  # type: ignore[arg-type]
+                        detail=str(row.get("detail") or f"{rid} requested but no implementing evidence in the diff."),
+                        requirement_id=rid,
+                        evidence=[f'no signal for "{req.text}"'],
+                    )
+                )
+            return findings
+    # Deterministic fallback.
+    signals = detect_signals(docket.diff)
+    omissions: list[Finding] = []
+    for req in requirements:
+        if not is_met(req, signals):
+            severity = "critical" if req.priority == "must" else "medium"
+            omissions.append(
+                Finding(
+                    agent="GHOST",
+                    kind="omission",
+                    severity=severity,  # type: ignore[arg-type]
+                    detail=f"{req.id} requested but no implementing evidence in the diff.",
+                    requirement_id=req.id,
+                    evidence=[f'no signal for "{req.text}"'],
+                )
+            )
+    return omissions
+
+
+_DRIFT_SCHEMA: dict = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["drifts"],
+    "properties": {
+        "drifts": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["file_ref", "severity", "detail", "evidence"],
+                "properties": {
+                    "file_ref": {"type": "string"},
+                    "severity": {"type": "string", "enum": ["critical", "high", "medium", "low"]},
+                    "detail": {"type": "string"},
+                    "evidence": {"type": "string"},
+                },
+            },
+        }
+    },
+}
+
+
+def drift_findings(
+    docket: Docket, requirements: list[RequirementItem], impl: list[ImplementationFinding]
+) -> list[Finding]:
+    """DRIFT — changes in the diff that no requirement authorized (scope creep)."""
+    if _use_llm(docket):
+        req_text = "\n".join(f"{r.id}: {r.text}" for r in requirements) or "(none)"
+        con_text = "\n".join(extract_constraints(docket)) or "(none stated)"
+        data = complete_json(
+            "You are DRIFT, a scope auditor. Find changes in the diff that NO requirement "
+            "authorized — unrequested scope creep, especially changes that violate a stated "
+            "constraint. Do NOT flag changes that trace to a requirement.",
+            f"Requirements:\n{req_text}\n\nConstraints:\n{con_text}\n\nDiff:\n{docket.diff}\n\n"
+            "Return JSON {drifts:[{file_ref,severity,detail,evidence}]}. Empty array if all changes trace to a requirement.",
+            _DRIFT_SCHEMA,
+            provider_hint="cerebras",
+        )
+        if data is not None and isinstance(data.get("drifts"), list):
+            findings: list[Finding] = []
+            for row in data["drifts"]:
+                detail = str(row.get("detail", "")).strip()
+                if not detail:
+                    continue
+                severity = str(row.get("severity", "high")).lower()
+                if severity not in ("critical", "high", "medium", "low"):
+                    severity = "high"
+                evidence = str(row.get("evidence", "")).strip()
+                findings.append(
+                    Finding(
+                        agent="DRIFT",
+                        kind="scope_drift",
+                        severity=severity,  # type: ignore[arg-type]
+                        detail=detail,
+                        file_ref=str(row.get("file_ref", "")).strip() or None,
+                        evidence=[evidence] if evidence else [],
+                    )
+                )
+            return findings
+    # Deterministic fallback.
+    drifts: list[Finding] = []
+    constraints = extract_constraints(docket)
+    for finding in impl:
+        if finding.kind != "changed":
+            continue
+        ref_lower = finding.file_ref.lower()
+        if "middleware" in ref_lower:
+            violates = any("middleware" in c.lower() for c in constraints)
+            drifts.append(
+                Finding(
+                    agent="DRIFT",
+                    kind="scope_drift",
+                    severity="high",
+                    detail="Auth middleware behaviour changed — no requirement authorizes this"
+                    + (" and it violates a stated constraint." if violates else "."),
+                    file_ref=finding.file_ref,
+                    evidence=[finding.evidence],
+                )
+            )
+        elif "payment" in ref_lower or "gateway" in ref_lower:
+            violates = any("payment" in c.lower() or "gateway" in c.lower() or "config" in c.lower() for c in constraints)
+            drifts.append(
+                Finding(
+                    agent="DRIFT",
+                    kind="scope_drift",
+                    severity="high",
+                    detail="Payment gateway configuration hardcoded — no requirement authorizes this"
+                    + (" and it violates an explicit constraint." if violates else "."),
+                    file_ref=finding.file_ref,
+                    evidence=[finding.evidence],
+                )
+            )
+    return drifts
+
+
+_ARBITER_SCHEMA: dict = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["summary"],
+    "properties": {"summary": {"type": "string"}},
+}
+
+
+def arbiter_summarize(docket: Docket, verdict: Verdict) -> Verdict:
+    """ARBITER — optionally rewrite the verdict *summary prose* via the LLM.
+
+    Scoring is deterministic and authoritative: this only ever replaces the
+    one-line ``summary`` string, never the trust score, merge decision, or
+    ledger. Any failure leaves the deterministic summary untouched.
+    """
+    if not _use_llm(docket):
+        return verdict
+    data = complete_json(
+        "You are ARBITER, the judge. Write a single neutral one-sentence verdict summary for an "
+        "intent-conformance review. Do not invent facts; reflect the given state and findings.",
+        f"State: {verdict.state}\nMerge: {verdict.merge_decision}\nTrust: {verdict.trust_score}/100\n"
+        f"Blockers: {verdict.blockers}\nConditions: {verdict.conditions}\n\nReturn JSON {{summary}}.",
+        _ARBITER_SCHEMA,
+        max_tokens=200,
+    )
+    if data and isinstance(data.get("summary"), str) and data["summary"].strip():
+        return verdict.model_copy(update={"summary": data["summary"].strip()})
+    return verdict
+
+
 def _msg(agent: str, text: str, target: list[str] | None = None) -> TribunalEvent:
     return TribunalEvent(type="message", agent=agent, target=target, text=text)  # type: ignore[arg-type]
 
@@ -205,7 +534,7 @@ def _evt(agent: str, kind: str, payload: dict, text: str = "") -> TribunalEvent:
     return TribunalEvent(type="event", agent=agent, text=text, payload={"kind": kind, **payload})  # type: ignore[arg-type]
 
 
-def _with_band(event: TribunalEvent, band: BandAdapter, *, mirrored: bool = True) -> TribunalEvent:
+def _with_band(event: TribunalEvent, band: CoordinationBackend, *, mirrored: bool = True) -> TribunalEvent:
     payload = dict(event.payload)
     payload["band"] = band.band_meta(mirrored=mirrored)
     return event.model_copy(update={"payload": payload})
@@ -213,7 +542,7 @@ def _with_band(event: TribunalEvent, band: BandAdapter, *, mirrored: bool = True
 
 async def run_trial(docket: Docket, *, delay: float = STEP_DELAY) -> AsyncIterator[TribunalEvent]:
     started = time.perf_counter()
-    band = BandAdapter()
+    band = get_coordination_backend()
     room_id: str | None = None
     band_warnings: list[str] = []
 
@@ -327,8 +656,7 @@ async def run_trial(docket: Docket, *, delay: float = STEP_DELAY) -> AsyncIterat
         yield ev
 
     # 3. ADVOCATE — requirements.
-    requirements = extract_requirements(docket)
-    extract_constraints(docket)
+    requirements = advocate_extract(docket)
     for req in requirements:
         async for ev in stream_emit(_evt("ADVOCATE", "requirement", {"requirement": req.model_dump()}, text=f"{req.id} · {req.text}")):
             yield ev
@@ -343,8 +671,7 @@ async def run_trial(docket: Docket, *, delay: float = STEP_DELAY) -> AsyncIterat
         yield ev
 
     # 4. SURVEYOR — implementation.
-    signals = detect_signals(docket.diff)
-    impl = survey_implementation(docket, signals)
+    impl = surveyor_inspect(docket)
     for finding in impl:
         async for ev in stream_emit(
             _evt("SURVEYOR", "implementation", {"finding": finding.model_dump()}, text=f"{finding.id} · {finding.summary}")
@@ -373,20 +700,7 @@ async def run_trial(docket: Docket, *, delay: float = STEP_DELAY) -> AsyncIterat
         yield ev
 
     # 6. GHOST — omissions.
-    omissions: list[Finding] = []
-    for req in requirements:
-        if not is_met(req, signals):
-            severity = "critical" if req.priority == "must" else "medium"
-            omissions.append(
-                Finding(
-                    agent="GHOST",
-                    kind="omission",
-                    severity=severity,  # type: ignore[arg-type]
-                    detail=f"{req.id} requested but no implementing evidence in the diff.",
-                    requirement_id=req.id,
-                    evidence=[f'no signal for "{req.text}"'],
-                )
-            )
+    omissions = ghost_omissions(docket, requirements, impl)
     if omissions:
         async for ev in stream_emit(
             _evt(
@@ -407,53 +721,14 @@ async def run_trial(docket: Docket, *, delay: float = STEP_DELAY) -> AsyncIterat
             yield ev
 
     # 7. DRIFT — scope creep.
-    drifts: list[Finding] = []
-    constraints = extract_constraints(docket)
-    for finding in impl:
-        if finding.kind != "changed":
-            continue
-        ref_lower = finding.file_ref.lower()
-        if "middleware" in ref_lower:
-            violates = any("middleware" in c.lower() for c in constraints)
-            drifts.append(
-                Finding(
-                    agent="DRIFT",
-                    kind="scope_drift",
-                    severity="high",
-                    detail="Auth middleware behaviour changed — no requirement authorizes this"
-                    + (" and it violates a stated constraint." if violates else "."),
-                    file_ref=finding.file_ref,
-                    evidence=[finding.evidence],
-                )
-            )
-        elif "payment" in ref_lower or "gateway" in ref_lower:
-            violates = any("payment" in c.lower() or "gateway" in c.lower() or "config" in c.lower() for c in constraints)
-            drifts.append(
-                Finding(
-                    agent="DRIFT",
-                    kind="scope_drift",
-                    severity="high",
-                    detail="Payment gateway configuration hardcoded — no requirement authorizes this"
-                    + (" and it violates an explicit constraint." if violates else "."),
-                    file_ref=finding.file_ref,
-                    evidence=[finding.evidence],
-                )
-            )
+    drifts = drift_findings(docket, requirements, impl)
     if drifts:
         drift_text = f"Unauthorized change detected. {len(drifts)} modification(s) outside the docket."
-        drift_provider_status = "fallback"
-        featherless = call_featherless_json(
-            f"Ticket prohibited unauthorized auth middleware changes. Finding: {drifts[0].detail}. "
-            "Return JSON with key explanation — one sentence why this is scope drift."
-        )
-        if featherless and featherless.get("explanation"):
-            drift_provider_status = "live"
-            drift_text = f"{drift_text} {featherless['explanation']}"
         async for ev in stream_emit(
             _evt(
                 "DRIFT",
                 "summary",
-                {"text": drift_text, "provider_status": drift_provider_status},
+                {"text": drift_text},
                 text=drift_text,
             )
         ):
@@ -573,7 +848,8 @@ async def run_trial(docket: Docket, *, delay: float = STEP_DELAY) -> AsyncIterat
     async for ev in stream_emit(_msg("CLERK", "Issue the ruling from the event ledger.", target=["ARBITER"])):
         yield ev
 
-    verdict = adjudicate(requirements, omissions, drifts, constraint_findings, signals)
+    verdict = adjudicate(requirements, omissions, drifts, constraint_findings, {})
+    verdict = arbiter_summarize(docket, verdict)
     try:
         await band.post_event(room_id, "ARBITER", "verdict", verdict.model_dump(), text=verdict.summary)
         verdict_mirrored = True

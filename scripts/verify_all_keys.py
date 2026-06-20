@@ -1,4 +1,4 @@
-"""Verify Band + partner keys without printing secrets."""
+"""Verify Band coordination + LLM reasoning keys without printing secrets."""
 from __future__ import annotations
 
 import os
@@ -66,7 +66,7 @@ def test_band() -> None:
 
 def test_openai_compat(label: str, key: str, base_url: str, model: str) -> None:
     if not key:
-        ok(label, False, "key missing (check AIMLAPI_API_KEY / aimlapi_api_key)")
+        ok(label, False, "key missing")
         return
     try:
         from openai import OpenAI
@@ -88,16 +88,16 @@ def main() -> int:
     test_band()
     print()
     test_openai_compat(
-        "AI/ML API",
-        pick("AIMLAPI_API_KEY", "aimlapi_api_key"),
-        "https://api.aimlapi.com/v1",
-        "gpt-4o-mini",
+        "Groq",
+        pick("GROQ_API_KEY", "groq_api_key"),
+        "https://api.groq.com/openai/v1",
+        "llama-3.3-70b-versatile",
     )
     test_openai_compat(
-        "Featherless",
-        pick("FEATHERLESS_API_KEY", "featherless_api_key"),
-        "https://api.featherless.ai/v1",
-        "deepseek-ai/DeepSeek-V3-0324",
+        "Cerebras",
+        pick("CEREBRAS_API_KEY", "cerebras_api_key"),
+        "https://api.cerebras.ai/v1",
+        "llama-3.3-70b",
     )
     return 0
 

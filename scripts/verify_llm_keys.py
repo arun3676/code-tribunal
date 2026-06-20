@@ -57,6 +57,18 @@ def test_openai_compat(label: str, key: str, base_url: str, model: str) -> None:
 
 def main() -> int:
     print("=== LLM key smoke tests ===")
+    test_openai_compat(
+        "Groq",
+        os.getenv("GROQ_API_KEY", "").strip(),
+        "https://api.groq.com/openai/v1",
+        "llama-3.3-70b-versatile",
+    )
+    test_openai_compat(
+        "Cerebras",
+        os.getenv("CEREBRAS_API_KEY", "").strip(),
+        "https://api.cerebras.ai/v1",
+        "llama-3.3-70b",
+    )
     test_gemini(os.getenv("GEMINI_API_KEY", "").strip())
     test_openai_compat(
         "DeepSeek",

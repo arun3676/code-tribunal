@@ -15,12 +15,12 @@ import time
 
 from .protocol import Docket, IntentSource, Verdict
 from .runner import (
-    detect_signals,
-    extract_requirements,
-    is_met,
+    advocate_extract,
+    drift_findings,
+    ghost_omissions,
     requirement_signal,
     run_trial,
-    survey_implementation,
+    surveyor_inspect,
 )
 
 # --- Docket construction (shared with server.py) ----------------------------
@@ -131,36 +131,41 @@ async def run_trial_collect(docket: Docket) -> dict:
 
 
 def ghost_check_docket(docket: Docket) -> list[dict]:
-    """Return requested-but-missing requirements (GHOST's negative space)."""
-    signals = detect_signals(docket.diff)
+    """Return requested-but-missing requirements (GHOST's negative space).
+
+    Uses the LLM-backed agents (deterministic fallback) so it works on real,
+    free-form tickets/diffs — not just numbered fixtures.
+    """
+    requirements = advocate_extract(docket)
+    by_id = {req.id: req for req in requirements}
     missing: list[dict] = []
-    for req in extract_requirements(docket):
-        if not is_met(req, signals):
-            missing.append(
-                {
-                    "requirement_id": req.id,
-                    "requirement": req.text,
-                    "priority": req.priority,
-                    "severity": "critical" if req.priority == "must" else "medium",
-                    "signal": requirement_signal(req),
-                }
-            )
+    for finding in ghost_omissions(docket, requirements, []):
+        req = by_id.get(finding.requirement_id or "")
+        missing.append(
+            {
+                "requirement_id": finding.requirement_id,
+                "requirement": req.text if req else finding.detail,
+                "priority": req.priority if req else ("must" if finding.severity == "critical" else "should"),
+                "severity": finding.severity,
+                "signal": requirement_signal(req) if req else None,
+            }
+        )
     return missing
 
 
 def drift_check_docket(docket: Docket) -> list[dict]:
     """Return changes with no authorizing requirement (DRIFT's scope creep)."""
-    signals = detect_signals(docket.diff)
+    requirements = advocate_extract(docket)
+    impl = surveyor_inspect(docket)
     drifts: list[dict] = []
-    for finding in survey_implementation(docket, signals):
-        if finding.kind == "changed":
-            drifts.append(
-                {
-                    "file_ref": finding.file_ref,
-                    "summary": finding.summary,
-                    "evidence": finding.evidence,
-                }
-            )
+    for finding in drift_findings(docket, requirements, impl):
+        drifts.append(
+            {
+                "file_ref": finding.file_ref or "",
+                "summary": finding.detail,
+                "evidence": "; ".join(finding.evidence),
+            }
+        )
     return drifts
 
 
