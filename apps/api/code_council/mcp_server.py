@@ -14,19 +14,27 @@ Tools
 - ``drift_check``  fast: changes with no authorizing requirement only.
 
 Run (stdio):
+    tribunal-mcp           # installed console script
     python -m code_council.mcp_server
 
-Register in Claude Code / Cursor MCP config, e.g.::
+Register in Claude Code / Cursor MCP config (clone-free via uvx)::
 
     {
       "mcpServers": {
         "tribunal": {
-          "command": "python",
-          "args": ["-m", "code_council.mcp_server"],
-          "cwd": "apps/api"
+          "command": "uvx",
+          "args": ["--from", "code-tribunal", "tribunal-mcp"],
+          "env": { "GROQ_API_KEY": "<your key>" }
         }
       }
     }
+
+Codex (~/.codex/config.toml)::
+
+    [mcp_servers.tribunal]
+    command = "uvx"
+    args = ["--from", "code-tribunal", "tribunal-mcp"]
+    env = { GROQ_API_KEY = "<your key>" }
 """
 
 from __future__ import annotations
@@ -109,6 +117,14 @@ def drift_check(ticket_description: str, git_diff: str) -> dict:
 
 
 def main() -> None:
+    # Load a local gitignored .env so a self-hosted `tribunal-mcp` finds keys
+    # without exporting them; an MCP client `env` block still takes precedence.
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv()
+    except Exception:  # pragma: no cover - dotenv is a hard dep, but stay safe
+        pass
     mcp.run()
 
 

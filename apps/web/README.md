@@ -1,6 +1,7 @@
-# Code Council Web
+# Code Tribunal Web
 
-Next.js 15 frontend for [Code Council Tribunal](https://github.com/arun3676/code-tribunal-lab-lab).
+Next.js 15 frontend for [Code Tribunal](https://github.com/arun3676/code-tribunal) — the landing
+demo for the engine that ships as a CLI + MCP server.
 
 ## Routes
 

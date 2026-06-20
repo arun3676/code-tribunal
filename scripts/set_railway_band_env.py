@@ -19,7 +19,6 @@ KEYS = [
     "BAND_DRIFT_ID",
     "BAND_WARDEN_ID",
     "BAND_ARBITER_ID",
-    "FEATHERLESS_API_KEY",
 ]
 
 

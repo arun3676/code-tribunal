@@ -1,6 +1,7 @@
-# Code Council API
+# Code Tribunal API
 
-FastAPI backend for [Code Council Tribunal](https://github.com/arun3676/code-tribunal-lab-lab).
+FastAPI backend for [Code Tribunal](https://github.com/arun3676/code-tribunal). Also ships a
+CLI (`tribunal`) and an MCP server (`tribunal-mcp`) over the same engine — see the root README.
 
 ## Endpoints
 
@@ -49,20 +50,25 @@ Or from repo root: `docker compose up api`
 ```
 code_council/
 ├── server.py
+├── cli.py             # `tribunal` CLI (verify / ghost / drift)
+├── mcp_server.py      # `tribunal-mcp` MCP server
 ├── analyzer.py
 ├── scanners/
 ├── multimodal.py
 ├── github.py          # reserved — not exposed via API yet
 └── tribunal/
-    ├── protocol.py    # Pydantic schemas + AGENTS roster
-    ├── fixtures.py    # auth-login-001, health-check-002
-    ├── runner.py      # deterministic staged trial
+    ├── protocol.py      # Pydantic schemas + AGENTS roster
+    ├── fixtures.py      # auth-login-001, health-check-002, payment-refund-003, user-profile-004
+    ├── llm.py           # reasoning layer: Groq → Cerebras → Gemini fallback
+    ├── runner.py        # staged trial: LLM agents + deterministic fallback
+    ├── coordination.py  # CoordinationBackend seam (Band today, swappable)
     └── band_adapter.py
 ```
 
 ## Tribunal env vars
 
-See [`apps/api/.env.example`](.env.example) — `BAND_*`, `AIMLAPI_API_KEY`, `FEATHERLESS_API_KEY`.
+See [`apps/api/.env.example`](.env.example) — `GROQ_API_KEY`, `CEREBRAS_API_KEY`, `GEMINI_API_KEY`,
+`TRIBUNAL_LLM_PROVIDERS`, `COORDINATION_BACKEND`, and `BAND_*` (coordination layer).
 
 ## Deploy
 

@@ -19,7 +19,7 @@ import httpx
 
 logger = logging.getLogger("code_council.tribunal.band")
 
-# Band handles (without leading @) — see docs/hackathon/band-agents.md
+# Band handles (without leading @) for each Tribunal agent.
 AGENT_HANDLES: dict[str, str] = {
     "CLERK": "arunn9694/tribunal-clerk",
     "ADVOCATE": "arunn9694/intent-advocate",
