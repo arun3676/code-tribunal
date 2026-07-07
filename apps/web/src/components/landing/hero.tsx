@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import {
@@ -117,17 +116,17 @@ export function Hero() {
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link
-              href="/tribunal"
+            <a
+              href="#demo"
               className="btn-tactile inline-flex min-h-[44px] items-center justify-center rounded-xl border-2 border-[color:var(--ink)] bg-[color:var(--accent-soft)] px-6 py-3 font-mono text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--ink)]"
             >
-              Convene the court →
-            </Link>
+              See the court rule →
+            </a>
             <a
-              href="#install"
+              href="#waitlist"
               className="btn-tactile inline-flex min-h-[44px] items-center justify-center rounded-xl border-2 border-[color:var(--ink)] bg-elevated px-6 py-3 font-mono text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--ink)]"
             >
-              Install the CLI
+              Get early access
             </a>
           </div>
 

@@ -40,10 +40,19 @@ export function InstallSection() {
   return (
     <section id="install" aria-labelledby="install-heading" className="mx-auto w-full max-w-6xl scroll-mt-16 px-4 py-16 sm:px-6">
       <Reveal>
-        <div className="font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-fg-muted">Ship It Into Your Agent</div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-fg-muted">Ship It Into Your Agent</div>
+          <span className="rounded-full border-2 border-[color:var(--ink)] bg-[color:var(--accent-soft)] px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-[color:var(--ink)]">
+            Coming soon
+          </span>
+        </div>
         <h2 id="install-heading" className="mt-2 max-w-2xl text-2xl font-semibold leading-tight sm:text-3xl">
           The court travels. Install it where your agent works.
         </h2>
+        <p className="mt-2 max-w-2xl text-sm text-fg-muted">
+          Here&apos;s how the CLI and MCP server will wire into any coding agent. Publishing
+          alongside the hosted court — <a href="#waitlist" className="font-semibold text-fg underline underline-offset-2">join the waitlist</a> to get the install the day it ships.
+        </p>
       </Reveal>
 
       <Reveal className="mt-8">

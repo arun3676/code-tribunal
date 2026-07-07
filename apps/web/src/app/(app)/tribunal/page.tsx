@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ComingSoon, DEMO_ENABLED } from "@/components/landing/coming-soon";
 
 import {
   getTribunalFixtures,
@@ -76,6 +77,18 @@ function eventToChip(ev: TribunalEvent, seq: number): Chip | null {
 }
 
 export default function TribunalPage() {
+  if (!DEMO_ENABLED) {
+    return (
+      <ComingSoon
+        title="The Tribunal War Room is coming soon"
+        blurb="Watch seven AI agents cross-examine a real diff against its ticket and stamp a merge verdict. It ships alongside the hosted court."
+      />
+    );
+  }
+  return <TribunalApp />;
+}
+
+function TribunalApp() {
   const [fixtures, setFixtures] = useState<TribunalFixture[]>([]);
   const [fixtureId, setFixtureId] = useState<string>("");
   const [ticket, setTicket] = useState("");

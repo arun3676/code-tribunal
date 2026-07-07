@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import {
@@ -269,12 +268,12 @@ export function VerdictDemo() {
         >
           ↺ Replay
         </button>
-        <Link
-          href="/tribunal"
+        <a
+          href="#waitlist"
           className="btn-tactile inline-flex min-h-[44px] items-center justify-center rounded-xl border-2 border-[color:var(--ink)] bg-[color:var(--accent-soft)] px-6 py-3 font-mono text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--ink)]"
         >
-          Run it on a real PR →
-        </Link>
+          Run it on your own PRs →
+        </a>
       </div>
     </section>
   );

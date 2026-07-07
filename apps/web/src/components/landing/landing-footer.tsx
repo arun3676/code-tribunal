@@ -55,13 +55,8 @@ export function LandingFooter() {
                   </a>
                 </li>
                 <li>
-                  <a
-                    href="https://pypi.org/project/code-tribunal/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-fg-muted hover:text-fg"
-                  >
-                    PyPI
+                  <a href="#waitlist" className="text-fg-muted hover:text-fg">
+                    Early access
                   </a>
                 </li>
                 <li>

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { analyze, council, getModels, multimodal, scan, type ModelInfo, type ScanResult } from "@/lib/api";
 import AgentIntegrations from "@/components/showcase/agent-integrations";
 import MobileLanding from "@/components/showcase/mobile-landing";
+import { ComingSoon, DEMO_ENABLED } from "@/components/landing/coming-soon";
 
 const MonacoEditor = dynamic(async () => (await import("@monaco-editor/react")).default, {
   ssr: false,
@@ -88,7 +89,19 @@ function jaccard(left: string, right: string) {
   return union ? intersection / union : 0;
 }
 
-export default function HomePage() {
+export default function CouncilPage() {
+  if (!DEMO_ENABLED) {
+    return (
+      <ComingSoon
+        title="The Council editor is coming soon"
+        blurb="Multi-model code analysis in your browser — paste code, stream a council of models, and get a consensus verdict. It ships alongside the hosted court."
+      />
+    );
+  }
+  return <CouncilApp />;
+}
+
+function CouncilApp() {
   // null until matchMedia resolves — renders nothing for one frame instead of
   // flashing the mobile landing at desktop widths.
   const [isDesktop, setIsDesktop] = useState<boolean | null>(null);

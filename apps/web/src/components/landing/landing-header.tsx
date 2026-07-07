@@ -21,9 +21,9 @@ export function LandingHeader() {
         </Link>
 
         <nav aria-label="Landing" className="flex shrink-0 items-center gap-4">
-          <Link href="/council" className="hidden font-mono text-xs font-bold uppercase tracking-[0.16em] text-fg-muted hover:text-fg sm:inline">
-            Council
-          </Link>
+          <a href="#waitlist" className="hidden font-mono text-xs font-bold uppercase tracking-[0.16em] text-fg-muted hover:text-fg sm:inline">
+            Waitlist
+          </a>
           <a
             href={GITHUB_URL}
             target="_blank"
@@ -32,12 +32,12 @@ export function LandingHeader() {
           >
             GitHub
           </a>
-          <Link
-            href="/tribunal"
+          <a
+            href="#demo"
             className="btn-tactile rounded-lg border-2 border-[color:var(--ink)] bg-[color:var(--accent-soft)] px-3 py-1.5 font-mono text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--ink)]"
           >
             Demo
-          </Link>
+          </a>
         </nav>
       </div>
     </header>

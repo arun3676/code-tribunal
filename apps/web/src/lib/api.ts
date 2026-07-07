@@ -112,10 +112,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export async function joinWaitlist(email: string): Promise<{ ok: boolean }> {
-  return request<{ ok: boolean }>("/waitlist", {
+  // Same-origin Next.js route (app/api/waitlist) — keeps the landing's CTA
+  // working on Vercel without the Python backend deployed.
+  const response = await fetch("/api/waitlist", {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email }),
+    cache: "no-store",
   });
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+  return response.json() as Promise<{ ok: boolean }>;
 }
 
 async function* streamSse(path: string, payload: unknown, signal?: AbortSignal): AsyncGenerator<StreamEvent> {
