@@ -23,6 +23,10 @@ uvx --from code-tribunal tribunal-mcp          # MCP server, no install
 | POST | `/multimodal` | JSON | Image analysis |
 | GET | `/tribunal/fixtures` | JSON | Demo docket list |
 | POST | `/tribunal/run` | SSE | Stream a Tribunal trial |
+| POST | `/tribunal/verdict` | JSON | One-shot trial → verdict (headless; 15–30s) |
+| POST | `/tribunal/review-pr` | JSON | Adjudicate a GitHub PR by URL |
+| POST | `/waitlist` | JSON | Hosted-court invite registration |
+| POST | `/webhooks/github` | JSON | GitHub webhook (HMAC-verified) |
 
 ### Tribunal run payload
 
@@ -108,7 +112,7 @@ code_council/
 ├── analyzer.py
 ├── scanners/
 ├── multimodal.py
-├── github.py          # reserved — not exposed via API yet
+├── github.py          # GitHub diff fetching (powers /tribunal/review-pr + webhook)
 └── tribunal/
     ├── protocol.py      # Pydantic schemas + AGENTS roster
     ├── fixtures.py      # auth-login-001, health-check-002, payment-refund-003, user-profile-004

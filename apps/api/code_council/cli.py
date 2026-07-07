@@ -373,12 +373,13 @@ def main(argv: list[str] | None = None) -> int:
             stream.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
         except (AttributeError, ValueError):  # pragma: no cover - non-reconfigurable stream
             pass
-    # Pick up a local .env (gitignored) so `tribunal` works without exporting
-    # keys by hand; real env vars and MCP `env` blocks still take precedence.
+    # Pick up a .env from the CWD (the repo being verified) so `tribunal` works
+    # without exporting keys by hand; real env vars still take precedence, and
+    # we never walk up from this module's own source tree.
     try:
-        from dotenv import load_dotenv
+        from dotenv import find_dotenv, load_dotenv
 
-        load_dotenv()
+        load_dotenv(find_dotenv(usecwd=True))
     except Exception:  # pragma: no cover - dotenv is a hard dep, but stay safe
         pass
     parser = _build_parser()

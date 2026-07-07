@@ -89,7 +89,7 @@ def main() -> int:
     )
     test_openai_compat(
         "Kimi",
-        os.getenv("Kimi_API_KEY", "").strip(),
+        os.getenv("KIMI_API_KEY", "").strip(),
         "https://api.moonshot.ai/v1",
         "moonshot-v1-8k",
     )

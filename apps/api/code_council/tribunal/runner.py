@@ -78,7 +78,9 @@ def extract_constraints(docket: Docket) -> list[str]:
 _SIGNALS: dict[str, str] = {
     "login_endpoint": r"/api/login|router\.(post|get)\(",
     "bcrypt": r"bcrypt|\.compare\(",
-    "rate_limit": r"rate[\s_-]?limit|limiter|throttle|attempts?\b",
+    # NOTE: deliberately narrow — matching loose words like "attempts" lets a
+    # logging-only diff satisfy a rate-limiting requirement (false negative).
+    "rate_limit": r"rate[\s_-]?limit|limiter|throttle",
     "audit_log": r"audit",
     "tests": r"\btest\(|describe\(|\.test\.",
     "health_endpoint": r"/api/health",
@@ -191,10 +193,16 @@ def requirement_signal(req: RequirementItem) -> str | None:
     return None
 
 
-def is_met(req: RequirementItem, signals: dict[str, bool]) -> bool:
+def is_met(req: RequirementItem, signals: dict[str, bool]) -> bool | None:
+    """True/False when a deterministic signal exists; None = unverifiable offline.
+
+    Unmapped requirements must NOT silently count as met — the zero-key engine
+    would otherwise APPROVE anything it can't parse. Callers surface None as an
+    "unverified" condition instead.
+    """
     signal = requirement_signal(req)
     if signal is None:
-        return True
+        return None
     return signals.get(signal, False)
 
 
@@ -385,7 +393,24 @@ def ghost_omissions(
     signals = detect_signals(docket.diff)
     omissions: list[Finding] = []
     for req in requirements:
-        if not is_met(req, signals):
+        met = is_met(req, signals)
+        if met is None:
+            # No offline signal for this wording — honest "unverified", never a
+            # silent pass. severity "low" is adjudicated as a condition.
+            omissions.append(
+                Finding(
+                    agent="GHOST",
+                    kind="omission",
+                    severity="low",
+                    detail=(
+                        f"{req.id} could not be verified by the offline engine — "
+                        "add an LLM key (tribunal doctor) for full analysis."
+                    ),
+                    requirement_id=req.id,
+                    evidence=[f'no deterministic signal for "{req.text}"'],
+                )
+            )
+        elif not met:
             severity = "critical" if req.priority == "must" else "medium"
             omissions.append(
                 Finding(
@@ -901,11 +926,21 @@ def adjudicate(
     blockers: list[str] = []
     conditions: list[str] = []
 
+    unverified_ids: set[str] = set()
     for finding in omissions:
         if finding.severity == "critical":
             score -= 30
             deductions.append(TrustDeduction(reason=f"Unmet MUST ({finding.requirement_id})", points=-30))
             blockers.append(finding.detail)
+        elif finding.severity == "low":
+            # Offline engine couldn't verify this requirement — a condition,
+            # never a silent pass and never a fabricated "unmet".
+            score -= 5
+            deductions.append(
+                TrustDeduction(reason=f"Unverified offline ({finding.requirement_id})", points=-5)
+            )
+            conditions.append(finding.detail)
+            unverified_ids.add(finding.requirement_id or "")
         else:
             score -= 10
             deductions.append(TrustDeduction(reason=f"Unmet SHOULD ({finding.requirement_id})", points=-10))
@@ -925,9 +960,12 @@ def adjudicate(
     score = max(0, min(100, score))
 
     ledger: list[LedgerRow] = []
-    unmet_ids = {o.requirement_id for o in omissions}
+    unmet_ids = {o.requirement_id for o in omissions} - unverified_ids
     for req in requirements:
-        if req.id in unmet_ids:
+        if req.id in unverified_ids:
+            decision = "CONDITION"
+            notes = "Not verifiable by the offline engine — add an LLM key for full analysis."
+        elif req.id in unmet_ids:
             decision = "UNMET"
             notes = "Requested but absent from the diff."
         else:
@@ -945,7 +983,9 @@ def adjudicate(
             )
         )
 
-    if score <= 49:
+    if blockers or score <= 49:
+        # A blocker is a blocker — the verdict must never read APPROVE while
+        # the blockers list is non-empty, whatever the arithmetic says.
         state, merge = "DOES_NOT_CONFORM", "BLOCK"
         summary = "The implementation does not conform to the requested intent. Merge is blocked."
     elif score <= 79:

@@ -4,7 +4,7 @@ import os
 import time
 from typing import Any
 
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 from openai import OpenAI
 
 from .fixes import FixSuggestionGenerator
@@ -19,7 +19,7 @@ except ImportError:  # pragma: no cover
     _google_genai = None
 
 
-load_dotenv()
+load_dotenv(find_dotenv(usecwd=True))
 
 
 _GROQ_BASE_URL = "https://api.groq.com/openai/v1"
@@ -90,7 +90,7 @@ MODEL_REGISTRY: tuple[ModelDescriptor, ...] = (
         provider="kimi",
         display="Kimi",
         color="#9C27B0",
-        env_var="Kimi_API_KEY",
+        env_var="KIMI_API_KEY",
         base_url="https://api.moonshot.ai/v1",
         vision=True,
     ),

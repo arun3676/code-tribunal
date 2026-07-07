@@ -39,6 +39,8 @@ Codex (~/.codex/config.toml)::
 
 from __future__ import annotations
 
+import logging
+
 from mcp.server.fastmcp import FastMCP
 
 from .tribunal.headless import (
@@ -117,14 +119,18 @@ def drift_check(ticket_description: str, git_diff: str) -> dict:
 
 
 def main() -> None:
-    # Load a local gitignored .env so a self-hosted `tribunal-mcp` finds keys
-    # without exporting them; an MCP client `env` block still takes precedence.
+    # Load a .env from the process CWD (the agent's workspace) — never walk up
+    # from this module's directory, or an editable install silently inherits the
+    # source tree's .env and the client's `env` block stops being authoritative.
     try:
-        from dotenv import load_dotenv
+        from dotenv import find_dotenv, load_dotenv
 
-        load_dotenv()
+        load_dotenv(find_dotenv(usecwd=True))
     except Exception:  # pragma: no cover - dotenv is a hard dep, but stay safe
         pass
+    # MCP clients surface stderr in their logs; INFO-level request/Band chatter
+    # drowns them. Keep warnings and errors only.
+    logging.basicConfig(level=logging.WARNING, force=True)
     mcp.run()
 
 
