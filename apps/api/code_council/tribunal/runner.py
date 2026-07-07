@@ -47,6 +47,13 @@ STEP_DELAY = 0.45
 _REQ_RE = re.compile(r"R(\d+)\s*\((MUST|SHOULD)\)\s*:?\s*(.+)", re.IGNORECASE)
 
 
+_BULLET_RE = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s+(.{12,})$", re.MULTILINE)
+_IMPERATIVE_RE = re.compile(
+    r"\b(must|should|add|implement|return|limit|require|verify|validate|reject|write|create|log)\b",
+    re.IGNORECASE,
+)
+
+
 def extract_requirements(docket: Docket) -> list[RequirementItem]:
     items: list[RequirementItem] = []
     text = "\n".join(source.text for source in docket.intent_sources)
@@ -58,6 +65,28 @@ def extract_requirements(docket: Docket) -> list[RequirementItem]:
                 id=f"R{number}",
                 text=body.strip().rstrip("."),
                 priority="must" if priority.upper() == "MUST" else "should",
+                source_ref=source_ref,
+            )
+        )
+    if items:
+        return items
+    # Free-form fallback: a ticket without R#(MUST) markup still yields
+    # requirements — bullets/numbered lines first, else imperative sentences.
+    # Without this, the offline engine had nothing to judge and every verdict
+    # collapsed to domain heuristics.
+    candidates = [m.group(1).strip() for m in _BULLET_RE.finditer(text)]
+    if not candidates:
+        candidates = [
+            chunk.strip()
+            for chunk in re.split(r"(?<=[.!?;])\s+|\n", text)
+            if len(chunk.strip()) >= 12 and _IMPERATIVE_RE.search(chunk)
+        ]
+    for index, body in enumerate(candidates[:8], start=1):
+        items.append(
+            RequirementItem(
+                id=f"R{index}",
+                text=body.rstrip("."),
+                priority="must",
                 source_ref=source_ref,
             )
         )
@@ -851,17 +880,22 @@ async def run_trial(docket: Docket, *, delay: float = STEP_DELAY) -> AsyncIterat
         )
         await asyncio.sleep(delay)
         unmet_security = [o for o in omissions if o.requirement_id]
-        detail = "Policy requires throttling of failed logins. Missing rate limit is a blocking security control."
-        constraint_findings.append(
-            Finding(
-                agent="WARDEN",
-                kind="constraint",
-                severity="high",
-                detail=detail,
-                requirement_id=unmet_security[0].requirement_id if unmet_security else None,
-                evidence=["OWASP A07: Identification & Authentication Failures"],
+        # Evidence-based: the throttling constraint only fires when the diff
+        # actually lacks rate limiting — never as a canned verdict-by-domain.
+        if detect_signals(docket.diff).get("rate_limit"):
+            detail = "Throttling controls present in the diff — no security constraint violated."
+        else:
+            detail = "Policy requires throttling of failed logins. Missing rate limit is a blocking security control."
+            constraint_findings.append(
+                Finding(
+                    agent="WARDEN",
+                    kind="constraint",
+                    severity="high",
+                    detail=detail,
+                    requirement_id=unmet_security[0].requirement_id if unmet_security else None,
+                    evidence=["OWASP A07: Identification & Authentication Failures"],
+                )
             )
-        )
         async for ev in stream_emit(_evt("WARDEN", "summary", {"text": detail}, text=detail)):
             yield ev
         for finding in constraint_findings:

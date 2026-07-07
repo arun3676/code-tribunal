@@ -76,6 +76,46 @@ def test_unverified_requirements_surface_as_conditions() -> None:
     assert any("could not be verified" in c for c in verdict["conditions"])
 
 
+FREEFORM_TICKET = (
+    "Add rate limiting to the login endpoint: max 5 attempts / 15 min per IP, "
+    "return 429 with Retry-After."
+)
+
+RATE_LIMITED_DIFF = """\
+diff --git a/auth/login.py b/auth/login.py
+--- a/auth/login.py
++++ b/auth/login.py
+@@ -1,4 +1,7 @@
+ def login(request):
++    limiter = RateLimiter(max_attempts=5, window_minutes=15)
++    if limiter.exceeded(request.ip):
++        return TooManyRequests(retry_after=limiter.retry_after)
+     return handle_login(request)
+"""
+
+
+def test_freeform_ticket_extracts_requirements() -> None:
+    docket = build_adhoc_docket(title="freeform", ticket=FREEFORM_TICKET, diff=LOGGING_ONLY_DIFF)
+    result = asyncio.run(run_trial_collect(docket))
+    verdict = result["verdict"]
+    # Free-form text (no R#(MUST) markup) still yields judged requirements,
+    # and the logging-only diff must not pass.
+    assert verdict["ledger"], "free-form ticket produced an empty ledger"
+    assert verdict["merge_decision"] == "BLOCK"
+
+
+def test_conforming_diff_passes_offline() -> None:
+    docket = build_adhoc_docket(
+        title="conforming", ticket=FREEFORM_TICKET, diff=RATE_LIMITED_DIFF, touched_domains=["auth"]
+    )
+    result = asyncio.run(run_trial_collect(docket))
+    verdict = result["verdict"]
+    # The diff implements rate limiting: the WARDEN throttling constraint must
+    # NOT fire (it is evidence-based, not verdict-by-domain).
+    assert not any("Missing rate limit" in b for b in verdict["blockers"])
+    assert verdict["merge_decision"] != "BLOCK"
+
+
 def test_blockers_always_mean_block() -> None:
     requirements = [
         RequirementItem(id="R1", text="Rate-limit failed logins", priority="must", source_ref="t")

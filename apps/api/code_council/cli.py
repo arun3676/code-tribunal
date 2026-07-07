@@ -77,14 +77,27 @@ def _resolve_diff(args: argparse.Namespace) -> str:
             text=True,
         )
         if proc.returncode != 0:
-            raise RuntimeError(proc.stderr.strip() or "git diff failed")
+            # git's stderr can be a full 150-line usage screen — keep line one.
+            stderr_lines = (proc.stderr or "").strip().splitlines()
+            raise RuntimeError(stderr_lines[0] if stderr_lines else "git diff failed")
         return proc.stdout
     return _read_source(args.diff)
+
+
+def _empty_diff_exit(args: argparse.Namespace) -> int:
+    """Empty diff = nothing to review — a clean pass, not a silent 30s trial."""
+    if getattr(args, "json", False):
+        print(json.dumps({"empty_diff": True, "merge_decision": "APPROVE"}, indent=2))
+    elif not getattr(args, "quiet", False):
+        print("empty diff — nothing to review; clear to merge")
+    return EXIT_OK
 
 
 def _cmd_verify(args: argparse.Namespace) -> int:
     ticket = _read_source(args.ticket)
     diff = _resolve_diff(args)
+    if not diff.strip():
+        return _empty_diff_exit(args)
     docket = build_adhoc_docket(ticket, diff, _split_domains(args.domains), args.title)
     result = asyncio.run(run_trial_collect(docket))
     result["headline"] = summarize_verdict(result.get("verdict"))
@@ -124,7 +137,11 @@ def _print_verdict(result: dict) -> None:
 
 
 def _cmd_ghost(args: argparse.Namespace) -> int:
-    docket = build_adhoc_docket(_read_source(args.ticket), _resolve_diff(args))
+    ticket = _read_source(args.ticket)
+    diff = _resolve_diff(args)
+    if not diff.strip():
+        return _empty_diff_exit(args)
+    docket = build_adhoc_docket(ticket, diff)
     missing = ghost_check_docket(docket)
     if args.json:
         print(json.dumps({"missing": missing, "count": len(missing), "conforms": not missing}, indent=2))
@@ -140,7 +157,11 @@ def _cmd_ghost(args: argparse.Namespace) -> int:
 
 
 def _cmd_drift(args: argparse.Namespace) -> int:
-    docket = build_adhoc_docket(_read_source(args.ticket), _resolve_diff(args))
+    ticket = _read_source(args.ticket)
+    diff = _resolve_diff(args)
+    if not diff.strip():
+        return _empty_diff_exit(args)
+    docket = build_adhoc_docket(ticket, diff)
     drifts = drift_check_docket(docket)
     if args.json:
         print(json.dumps({"drifts": drifts, "count": len(drifts), "in_scope": not drifts}, indent=2))
@@ -303,13 +324,13 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_ghost = sub.add_parser("ghost", help="Fast omission pre-check")
     add_io(p_ghost)
-    p_ghost.add_argument("--json", action="store_true")
+    p_ghost.add_argument("--json", action="store_true", help="Emit the raw result as JSON")
     p_ghost.add_argument("--quiet", action="store_true", help=quiet_help)
     p_ghost.set_defaults(func=_cmd_ghost)
 
     p_drift = sub.add_parser("drift", help="Fast scope-drift pre-check")
     add_io(p_drift)
-    p_drift.add_argument("--json", action="store_true")
+    p_drift.add_argument("--json", action="store_true", help="Emit the raw result as JSON")
     p_drift.add_argument("--quiet", action="store_true", help=quiet_help)
     p_drift.set_defaults(func=_cmd_drift)
 

@@ -74,8 +74,11 @@ tribunal doctor                                           # check that your BYO 
 Bake in real keys with `--key`/`--groq-key`, `--cerebras-key`, `--gemini-key`; set the fallback
 chain with `--providers groq,cerebras,gemini`; override models with `--groq-model` /
 `--cerebras-model` / `--gemini-model`. `--write` writes the block to the agent's config path
-without clobbering an existing file. `--quiet` suppresses human output so agents can rely on
-the exit code.
+without clobbering an existing file. On `verify`/`ghost`/`drift`, `--quiet` suppresses human
+output so agents can rely on the exit code, and an empty diff exits 0 with "nothing to review".
+
+> Windows note: pipe `--json` output through `python -m json.tool` from cmd.exe or Git Bash —
+> Windows PowerShell 5.1 re-encodes pipes and breaks JSON parsing.
 
 `tribunal doctor [--json] [--offline]` is the recommended first step after adding keys: it
 prints KEY SET/MISSING per provider plus a live 1-token PASS/FAIL (keys are never printed) and

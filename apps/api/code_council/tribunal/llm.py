@@ -111,6 +111,12 @@ def _extract_json(content: str) -> dict | None:
     return None
 
 
+# Models that rejected strict json_schema this process — skip the doomed first
+# attempt (and its warning) on every subsequent call instead of paying a 400
+# round-trip per request.
+_SCHEMA_UNSUPPORTED: set[tuple[str, str]] = set()
+
+
 def _call_openai_compatible(provider: str, system: str, user: str, schema: dict, max_tokens: int) -> dict | None:
     _api_key_env, base_url, _model_env, _default_model = _OPENAI_COMPATIBLE[provider]
     client = OpenAI(api_key=resolve_key(provider), base_url=base_url, timeout=TIMEOUT)
@@ -123,18 +129,22 @@ def _call_openai_compatible(provider: str, system: str, user: str, schema: dict,
         "type": "json_schema",
         "json_schema": {"name": "result", "schema": schema, "strict": True},
     }
-    try:
-        response = client.chat.completions.create(
-            model=model,
-            messages=messages,  # type: ignore[arg-type]
-            temperature=0.1,
-            max_tokens=max_tokens,
-            response_format=json_schema_format,  # type: ignore[arg-type]
-        )
-    except Exception as exc:
-        # Cerebras (and some models) may reject strict json_schema — retry once
-        # with the looser json_object mode before giving up on this provider.
-        logger.warning("%s json_schema call failed (%s); retrying as json_object", provider, exc)
+    response = None
+    if (provider, model) not in _SCHEMA_UNSUPPORTED:
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,  # type: ignore[arg-type]
+                temperature=0.1,
+                max_tokens=max_tokens,
+                response_format=json_schema_format,  # type: ignore[arg-type]
+            )
+        except Exception as exc:
+            # Some models (e.g. Groq llama-3.3) reject strict json_schema —
+            # remember that and fall through to the looser json_object mode.
+            _SCHEMA_UNSUPPORTED.add((provider, model))
+            logger.debug("%s json_schema unsupported (%s); using json_object", provider, exc)
+    if response is None:
         response = client.chat.completions.create(
             model=model,
             messages=messages,  # type: ignore[arg-type]
