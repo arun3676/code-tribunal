@@ -4,12 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Route } from "next";
 import { PropsWithChildren, useEffect, useMemo, useState } from "react";
-import { LayoutGrid, Scale, Info } from "lucide-react";
+import { Home, LayoutGrid, Scale, Info } from "lucide-react";
 
 import { getHealth, getModels, type ModelInfo } from "@/lib/api";
 
 const NAV_TABS = [
-  { href: "/", label: "Home", Icon: LayoutGrid },
+  { href: "/", label: "Home", Icon: Home },
+  { href: "/council", label: "Council", Icon: LayoutGrid },
   { href: "/tribunal", label: "Tribunal", Icon: Scale },
   { href: "/about", label: "About", Icon: Info },
 ] as const;
@@ -39,7 +40,13 @@ export function AppShell({ children }: PropsWithChildren) {
         <div className="flex h-12 w-full items-center justify-between px-4 md:px-5">
           <div className="flex items-center gap-3">
             <Link href="/" className="font-mono text-sm font-bold tracking-[0.24em] text-fg">
-              CODE_COUNCIL<span className="animate-pulse">_</span>
+              CODE_TRIBUNAL<span className="animate-pulse">_</span>
+            </Link>
+            <Link
+              href={"/council" as Route}
+              className="hidden sm:inline-block btn-tactile rounded-lg border-2 border-[color:var(--ink)] bg-[color:var(--clerk)] px-2.5 py-1 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--ink)]"
+            >
+              Council
             </Link>
             <Link
               href={"/tribunal" as Route}

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, JetBrains_Mono } from "next/font/google";
 
-import { AppShell } from "@/components/shell/app-shell";
 import { ServiceWorkerRegister } from "@/components/pwa/sw-register";
 
 import "./globals.css";
@@ -35,7 +34,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <body className={`${geist.variable} ${mono.variable}`}>
-        <AppShell>{children}</AppShell>
+        {children}
         <ServiceWorkerRegister />
       </body>
     </html>

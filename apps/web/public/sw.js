@@ -1,5 +1,5 @@
-const CACHE_NAME = "tribunal-v1";
-const PRECACHE_URLS = ["/", "/tribunal", "/about"];
+const CACHE_NAME = "tribunal-v2";
+const PRECACHE_URLS = ["/", "/council", "/tribunal", "/about"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
