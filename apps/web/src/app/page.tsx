@@ -7,6 +7,7 @@ import { MotionRoot } from "@/components/landing/motion-primitives";
 import { Problem } from "@/components/landing/problem";
 import { TrialPipeline } from "@/components/landing/trial-pipeline";
 import { VerdictDemo } from "@/components/landing/verdict-demo";
+import { Waitlist } from "@/components/landing/waitlist";
 
 /*
  * Landing page — thin server component. MotionRoot (client) provides the
@@ -26,6 +27,7 @@ export default function LandingPage() {
           <TrialPipeline />
           <VerdictDemo />
           <InstallSection />
+          <Waitlist />
         </main>
         <LandingFooter />
       </div>

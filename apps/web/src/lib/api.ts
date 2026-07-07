@@ -111,6 +111,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+export async function joinWaitlist(email: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>("/waitlist", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
 async function* streamSse(path: string, payload: unknown, signal?: AbortSignal): AsyncGenerator<StreamEvent> {
   const response = await fetch(`${API_URL}${path}`, {
     method: "POST",

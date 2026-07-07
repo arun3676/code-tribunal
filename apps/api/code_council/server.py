@@ -99,6 +99,10 @@ class TribunalRequest(BaseModel):
     touched_domains: list[str] = Field(default_factory=list)
 
 
+class WaitlistRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+
+
 @app.on_event("startup")
 async def startup_event() -> None:
     for descriptor in analyzer.get_model_registry():
@@ -133,6 +137,41 @@ async def health() -> dict[str, str]:
 @app.get("/models")
 async def models() -> list[dict]:
     return analyzer.get_available_models()
+
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+@app.post("/waitlist")
+async def join_waitlist(payload: WaitlistRequest) -> dict:
+    """Register an email for the hosted-court invite list.
+
+    With RESEND_API_KEY + RESEND_AUDIENCE_ID configured, contacts land in the
+    Resend audience (so invitations can be broadcast from the dashboard).
+    Before the key exists, signups are logged so early registrations still
+    surface in the server logs.
+    """
+    email = payload.email.strip().lower()
+    if not _EMAIL_RE.match(email):
+        raise HTTPException(status_code=422, detail="invalid email address")
+
+    api_key = os.getenv("RESEND_API_KEY", "").strip()
+    audience = os.getenv("RESEND_AUDIENCE_ID", "").strip()
+    if api_key and audience:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                f"https://api.resend.com/audiences/{audience}/contacts",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={"email": email, "unsubscribed": False},
+            )
+        # 409 = already on the list — success from the visitor's perspective.
+        if response.status_code >= 400 and response.status_code != 409:
+            logger.warning("waitlist: resend rejected signup (status=%s)", response.status_code)
+            raise HTTPException(status_code=502, detail="signup temporarily unavailable")
+        return {"ok": True, "stored": "resend"}
+
+    logger.info("waitlist signup (resend not configured yet): %s", email)
+    return {"ok": True, "stored": "log"}
 
 
 @app.post("/scan")

@@ -35,6 +35,11 @@ TRIBUNAL_LLM_PROVIDERS=groq,cerebras,gemini
 # CEREBRAS_MODEL=
 # GEMINI_MODEL=
 
+# Waitlist invitations — landing-page signups land in this Resend audience.
+# Until both are set, POST /waitlist logs registrations instead.
+RESEND_API_KEY=
+RESEND_AUDIENCE_ID=
+
 DEEPSEEK_API_KEY=
 MERCURY_API_KEY=
 Kimi_API_KEY=
