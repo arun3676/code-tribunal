@@ -8,11 +8,14 @@ It ships three ways:
 
 - **CLI** — `tribunal verify` in any terminal or CI pipeline.
 - **MCP server** — drop it into Claude Code, Codex, or Cursor so your coding agent can self-check a diff before a human ever sees it.
-- **Web demo** — a live War Room that shows the agents deliberating.
+- **Web demo** — a live War Room that shows the agents deliberating: [code-council.vercel.app](https://code-council.vercel.app).
 
 A CLERK agent opens the case. ADVOCATE extracts requirements. SURVEYOR inspects the diff. GHOST finds requested work that is missing. DRIFT finds unrequested scope changes. WARDEN is recruited for security-sensitive changes. ARBITER produces the verdict.
 
+[![PyPI](https://img.shields.io/pypi/v/code-tribunal)](https://pypi.org/project/code-tribunal/)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+**Live demo:** [code-council.vercel.app](https://code-council.vercel.app) — landing at `/`, live Tribunal at [`/tribunal`](https://code-council.vercel.app/tribunal), Code Council editor at [`/council`](https://code-council.vercel.app/council).
 
 ---
 
@@ -50,9 +53,19 @@ Three decoupled layers — swapping any one never touches the others:
 | WARDEN | Security witness | Groq | Band (recruited) |
 | ARBITER | Judge | Groq + deterministic scoring | Band |
 
+### Model lineup (all free tiers)
+
+| Provider | Models | Override env |
+|----------|--------|--------------|
+| Groq (default) | `llama-3.3-70b-versatile` (default) · `openai/gpt-oss-120b` · `meta-llama/llama-4-scout-17b-16e-instruct` (Llama 4 Scout) | `GROQ_MODEL` |
+| Cerebras | `zai-glm-4.7` | `CEREBRAS_MODEL` |
+| Gemini | `gemini-3.5-flash` | `GEMINI_MODEL` |
+
+Fallback chain order is `TRIBUNAL_LLM_PROVIDERS=groq,cerebras,gemini`.
+
 ## Install (CLI / MCP)
 
-Run the MCP server with no clone via [`uvx`](https://docs.astral.sh/uv/). Bring your own key in the `env` block.
+Published on PyPI as [`code-tribunal`](https://pypi.org/project/code-tribunal/). Run the MCP server with no clone via [`uvx`](https://docs.astral.sh/uv/). Bring your own key in the `env` block.
 
 **Claude Code / Cursor** (`mcpServers` config):
 
@@ -87,6 +100,35 @@ tribunal verify --ticket ticket.md --diff change.diff
 
 MCP tools exposed: `verify_intent_conformance` (full court), `ghost_check` (fast omission pre-check), `drift_check` (fast scope-drift pre-check).
 
+### Bring your own keys (all free)
+
+Tribunal is BYO-key across three free-tier providers — any **one** key is enough. The fallback chain skips providers without keys, and with zero keys the deterministic engine still runs (works offline, still useful).
+
+- **Groq** — [console.groq.com](https://console.groq.com)
+- **Cerebras** — [cloud.cerebras.ai](https://cloud.cerebras.ai)
+- **Gemini** — [aistudio.google.com](https://aistudio.google.com)
+
+Bake a key into the MCP block (`--key` is an alias for `--groq-key`):
+
+```bash
+tribunal init claude --groq-key gsk_...
+```
+
+Multi-provider, with the fallback chain and a model override:
+
+```bash
+tribunal init claude \
+  --groq-key gsk_... --cerebras-key csk-... --gemini-key AIza... \
+  --providers groq,cerebras,gemini \
+  --groq-model llama-3.3-70b-versatile
+```
+
+Then verify your setup — `tribunal doctor` reports KEY SET/MISSING per provider plus a live 1-token PASS/FAIL (it never prints keys; exit `0` if at least one provider works):
+
+```bash
+tribunal doctor          # add --json for machines, --offline to skip live calls
+```
+
 ### Coding agents (OpenClaw · Hermes · …)
 
 Both [OpenClaw](https://docs.openclaw.ai/) and [Hermes](https://hermes-agent.nousresearch.com/docs/) are MCP clients, so the same server wires straight in. Generate the right block for any agent:
@@ -96,6 +138,8 @@ tribunal init openclaw   # ~/.openclaw/openclaw.json
 tribunal init hermes     # ~/.hermes/config.yaml (+ a bundled Open Skill)
 tribunal init claude     # mcpServers JSON
 ```
+
+Every emitter accepts the BYO-key flags above (`--groq-key` / `--cerebras-key` / `--gemini-key` / `--providers` / `--*-model`) plus `--write` to persist to the agent's config file.
 
 Per-agent guides, sample configs, and the Hermes Open Skill live in [`integrations/`](integrations/).
 
@@ -125,7 +169,7 @@ Set `BAND_ENABLED=true`, `BAND_STRICT=true`, and agent UUIDs for live mirroring.
 ## Local run (web demo)
 
 ```bash
-git clone <your-repo-url> code-tribunal
+git clone https://github.com/arun3676/code-tribunal.git
 cd code-tribunal
 cp .env.example .env    # add LLM (Groq/Cerebras/Gemini) + Band keys
 python scripts/check_env_keys.py
@@ -143,12 +187,14 @@ curl -N -X POST http://localhost:8000/tribunal/run \
 
 ## Other modes (web demo)
 
+The landing page lives at `/`, the live Tribunal at `/tribunal`, and the Code Council editor at `/council`:
+
 | Mode | Route | Description |
 |------|-------|-------------|
-| Solo | `/` | Single-model code analysis |
-| Council | `/` | Multi-model consensus |
-| Static scan | `/` | Security + performance rules |
-| Multimodal | `/` | Vision model upload |
+| Solo | `/council` | Single-model code analysis |
+| Council | `/council` | Multi-model consensus |
+| Static scan | `/council` | Security + performance rules |
+| Multimodal | `/council` | Vision model upload |
 
 ## Deployment
 

@@ -28,6 +28,21 @@ tribunal init codex         # ~/.codex/config.toml
 tribunal init --help        # all supported agents
 ```
 
+## Keys: bring any free provider
+
+Tribunal is BYO-key across Groq, Cerebras, and Gemini (all free tiers) — any one key is enough.
+Every `tribunal init` emitter can bake keys straight into the block:
+
+```bash
+tribunal init openclaw --groq-key gsk_...                       # --key is an alias
+tribunal init hermes --cerebras-key csk-... --gemini-key AIza... \
+  --providers groq,cerebras,gemini --gemini-model gemini-3.5-flash
+```
+
+With no flags you get the classic single-`GROQ_API_KEY` placeholder block (that's what the
+committed samples show). After adding keys, run `tribunal doctor` — it reports KEY SET/MISSING
+per provider plus a live 1-token PASS/FAIL, and never prints the keys themselves.
+
 ## Per-agent guides
 
 - [`openclaw/`](openclaw/) — self-hosted gateway, MCP via `openclaw mcp add`.

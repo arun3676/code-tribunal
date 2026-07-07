@@ -2,7 +2,7 @@
 
 Code Tribunal deploys as two services:
 
-- **Frontend:** `apps/web` on Vercel
+- **Frontend:** `apps/web` on Vercel — landing at `/`, live Tribunal demo at `/tribunal`, Code Council editor at `/council`
 - **Backend API:** `apps/api` on Railway
 
 The frontend calls `/health`, `/tribunal/fixtures`, `/tribunal/run`, plus Solo/Council routes.
@@ -28,6 +28,12 @@ GROQ_API_KEY=
 CEREBRAS_API_KEY=
 GEMINI_API_KEY=
 TRIBUNAL_LLM_PROVIDERS=groq,cerebras,gemini
+
+# Optional per-provider model overrides
+# (defaults: llama-3.3-70b-versatile / zai-glm-4.7 / gemini-3.5-flash)
+# GROQ_MODEL=
+# CEREBRAS_MODEL=
+# GEMINI_MODEL=
 
 DEEPSEEK_API_KEY=
 MERCURY_API_KEY=
@@ -86,11 +92,15 @@ Vercel project root directory:
 apps/web
 ```
 
-Environment variable:
+Environment variables:
 
 ```env
 NEXT_PUBLIC_API_URL=https://YOUR-RAILWAY-API
+NEXT_PUBLIC_SITE_URL=https://code-council.vercel.app
 ```
+
+`NEXT_PUBLIC_SITE_URL` is the canonical production URL — it feeds the OG/social metadata, so
+set it to your real domain if you deploy under a different one.
 
 ## 3. Connect CORS
 
@@ -100,6 +110,7 @@ After Vercel deploy, set Railway `ALLOWED_ORIGINS` to your production Vercel URL
 
 Open `https://YOUR-VERCEL-APP/tribunal`:
 
+- [ ] Landing page loads at `/`; Code Council editor loads at `/council`
 - [ ] Page loads (no `BACKEND_OFFLINE`)
 - [ ] Load **auth-login-001** → **Convene Tribunal**
 - [ ] GHOST flags R3 (rate limiting missing)
@@ -108,3 +119,7 @@ Open `https://YOUR-VERCEL-APP/tribunal`:
 - [ ] Verdict: DOES_NOT_CONFORM, BLOCK
 - [ ] Band room created (side-by-side check)
 - [ ] No CORS or mixed-content errors
+- [ ] Service worker picked up the deploy — the PWA (`public/sw.js`) is network-first, but
+      offline fallbacks come from a versioned cache (`CACHE_NAME`, e.g. `tribunal-v2`). If a
+      deploy changes precached shells, bump `CACHE_NAME` so `activate` purges the old cache;
+      then reload the page twice and confirm no stale UI

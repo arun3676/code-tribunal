@@ -28,6 +28,12 @@ openclaw mcp add tribunal \
 }
 ```
 
+Groq is just the default: any free key works (Groq / Cerebras / Gemini). Bake real keys in
+with `tribunal init openclaw --groq-key ... --cerebras-key ... --gemini-key ...
+--providers groq,cerebras,gemini` (plus optional `--groq-model` / `--cerebras-model` /
+`--gemini-model` overrides), then run `tribunal doctor` to confirm at least one provider
+answers — it never prints your keys.
+
 ## Use it
 
 Once registered, an OpenClaw agent can call `verify_intent_conformance`, `ghost_check`, and

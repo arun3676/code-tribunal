@@ -21,6 +21,12 @@ mcp_servers:
     enabled: true
 ```
 
+`GROQ_API_KEY` is only the default — any free key works (Groq / Cerebras / Gemini). Use
+`tribunal init hermes --groq-key ... --cerebras-key ... --gemini-key ...
+--providers groq,cerebras,gemini` (with optional `--groq-model` / `--cerebras-model` /
+`--gemini-model` overrides) to emit a multi-provider `env` block, and `tribunal doctor` to
+verify the keys actually work (it never prints them).
+
 ### Cost tuning with `tools.include`
 
 The fast checks (`ghost_check`, `drift_check`) are deterministic — no LLM round-trip. On a

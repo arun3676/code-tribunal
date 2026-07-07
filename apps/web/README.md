@@ -7,11 +7,12 @@ demo for the engine that ships as a CLI + MCP server.
 
 | Path | Description |
 |------|-------------|
+| `/` | Animated marketing landing (motion-driven hero, scripted verdict demo) |
 | `/tribunal` | **War Room** — Band deliberation, verdict stamp, trust meter, ledger |
-| `/` | Solo + Council analysis (Monaco editor, SSE streaming) |
+| `/council` | Solo + Council analysis (Monaco editor, SSE streaming) |
 | `/about` | Project overview |
 
-Header nav includes a **Tribunal** link (`app-shell.tsx`).
+Header nav includes **Council** and **Tribunal** links (`app-shell.tsx`); the landing has its own header/footer.
 
 ## Tribunal UI
 

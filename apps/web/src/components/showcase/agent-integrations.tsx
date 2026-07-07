@@ -17,16 +17,17 @@ const INTEGRATIONS: Integration[] = [
     tag: "Shell · CI",
     title: "CLI",
     color: "var(--arbiter)",
-    blurb: "Gate any PR from your terminal or pipeline. Exit 0 = clear to merge, 1 = blocked — drop it straight into CI.",
+    blurb: "Gate any PR from your terminal or pipeline. Exit 0 = clear to merge, 1 = blocked — drop it straight into CI. Bring any of Groq / Cerebras / Gemini — free tiers.",
     codeLabel: "gate a PR, exit-code only",
     code: "tribunal verify --ticket ticket.md --git --quiet || exit 1",
+    foot: "Check your keys first: tribunal doctor",
   },
   {
     tag: "Any MCP client",
     title: "MCP server",
     color: "var(--clerk)",
-    blurb: "One server, every MCP-native agent. Registers verify / ghost / drift as tools your agent calls mid-task.",
-    codeLabel: "Claude Code · Cursor (mcpServers)",
+    blurb: "One server, every MCP-native agent. Registers verify / ghost / drift as tools your agent calls mid-task. Groq is just the default key — tribunal init accepts --cerebras-key / --gemini-key too.",
+    codeLabel: "Claude Code · Cursor (mcpServers) — via tribunal init claude",
     code: `{
   "mcpServers": {
     "tribunal": {
