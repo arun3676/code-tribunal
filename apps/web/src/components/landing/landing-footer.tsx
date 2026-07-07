@@ -5,7 +5,7 @@ import { Reveal } from "@/components/landing/motion-primitives";
 
 /** Ink-top-border landing footer: wordmark, tagline, link columns, microline. */
 
-const GITHUB_URL = "https://github.com/arun3676/code-tribunal";
+import { GITHUB_URL } from "@/lib/site";
 
 export function LandingFooter() {
   return (

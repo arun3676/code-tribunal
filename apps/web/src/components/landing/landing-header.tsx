@@ -7,7 +7,7 @@ import Link from "next/link";
  * Mobile keeps it minimal: wordmark + Demo CTA only.
  */
 
-const GITHUB_URL = "https://github.com/arun3676/code-tribunal";
+import { GITHUB_URL } from "@/lib/site";
 
 export function LandingHeader() {
   return (

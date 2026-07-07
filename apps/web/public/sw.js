@@ -30,9 +30,13 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Put a clone in the cache on success
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        // Cache only successful same-origin responses — never error pages,
+        // never the cross-origin API (health polls would churn the cache).
+        const sameOrigin = new URL(event.request.url).origin === self.location.origin;
+        if (response.ok && sameOrigin) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
         return response;
       })
       .catch(() =>

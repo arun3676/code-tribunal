@@ -86,14 +86,10 @@ def chain() -> list[str]:
     return [p.strip().lower() for p in raw.split(",") if p.strip()]
 
 
-# Backwards-compatible private alias (pre-doctor internal name).
-_chain = chain
-
-
 def available_providers() -> list[str]:
     """Chain entries whose API key is present — handy for health/tests."""
 
-    return [provider for provider in _chain() if resolve_key(provider)]
+    return [provider for provider in chain() if resolve_key(provider)]
 
 
 def _extract_json(content: str) -> dict | None:
@@ -270,7 +266,7 @@ def complete_json(
             for DRIFT), before the rest of the chain.
     """
 
-    order = _chain()
+    order = chain()
     if provider_hint:
         hint = provider_hint.strip().lower()
         order = [hint] + [p for p in order if p != hint]

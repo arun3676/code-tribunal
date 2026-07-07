@@ -89,7 +89,9 @@ function jaccard(left: string, right: string) {
 }
 
 export default function HomePage() {
-  const [isDesktop, setIsDesktop] = useState(false);
+  // null until matchMedia resolves — renders nothing for one frame instead of
+  // flashing the mobile landing at desktop widths.
+  const [isDesktop, setIsDesktop] = useState<boolean | null>(null);
 
   useEffect(() => {
     const m = matchMedia("(min-width: 768px)");
@@ -117,7 +119,7 @@ export default function HomePage() {
   const [councilStartedAt, setCouncilStartedAt] = useState(0);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePrompt, setImagePrompt] = useState("Analyze this image and extract code or engineering-relevant details.");
-  const [imageModel, setImageModel] = useState("gemini-2.5-flash");
+  const [imageModel, setImageModel] = useState("gemini-3.5-flash");
   const [imagePreview, setImagePreview] = useState("");
   const [imageResult, setImageResult] = useState<{ analysis: string; code_extracted: string; suggestions: string[]; model: string } | null>(null);
   const [imageLoading, setImageLoading] = useState(false);
@@ -132,7 +134,13 @@ export default function HomePage() {
         setModels(data);
         const defaults = data.filter((item) => item.available).map((item) => item.id);
         setCouncilModels(defaults.slice(0, 4));
-        setModel((current) => current || defaults[0] || "");
+        // Validate against the live registry so a model id restored from
+        // localStorage that no longer exists falls back to a real default.
+        setModel((current) =>
+          current && data.some((item) => item.id === current) ? current : defaults[0] || ""
+        );
+        const vision = data.filter((item) => item.available && item.vision).map((item) => item.id);
+        setImageModel((current) => (vision.includes(current) ? current : vision[0] || current));
       })
       .catch(() => setModels([]));
   }, []);
@@ -401,6 +409,9 @@ export default function HomePage() {
   const councilCompleted = (Object.values(councilVerdicts) as CouncilEntry[]).filter((entry) => entry.done).length;
   const councilProgress = councilModels.length ? (councilCompleted / councilModels.length) * 100 : 0;
 
+  if (isDesktop === null) {
+    return null; // one blank frame while matchMedia resolves — no mobile flash
+  }
   if (!isDesktop) {
     return <MobileLanding />;
   }

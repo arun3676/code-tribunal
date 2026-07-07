@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCopyToClipboard } from "@/lib/use-copy";
 
 type Integration = {
   tag: string;
@@ -60,17 +60,7 @@ const INTEGRATIONS: Integration[] = [
 ];
 
 function CopyBlock({ code, label }: { code: string; label: string }) {
-  const [copied, setCopied] = useState(false);
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1200);
-    } catch {
-      /* clipboard unavailable (e.g. insecure context) — no-op */
-    }
-  }
+  const { copied, copy } = useCopyToClipboard();
 
   return (
     <div>
@@ -79,7 +69,7 @@ function CopyBlock({ code, label }: { code: string; label: string }) {
         <span className="min-w-0 truncate font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-fg-dim">{label}</span>
         {/* min-h-[40px] min-w-[56px] ensures touch target ≥40px on mobile */}
         <button
-          onClick={copy}
+          onClick={() => copy(code)}
           aria-label={copied ? "Copied to clipboard" : "Copy to clipboard"}
           className="btn-tactile min-h-[40px] min-w-[56px] shrink-0 rounded-md border-2 border-[color:var(--ink)] bg-[color:var(--bg-elevated)] px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-fg"
         >

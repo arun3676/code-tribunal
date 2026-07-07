@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import AgentIntegrations from "@/components/showcase/agent-integrations";
 import { Reveal } from "@/components/landing/motion-primitives";
+import { useCopyToClipboard } from "@/lib/use-copy";
 
 /**
  * "SHIP IT INTO YOUR AGENT" — headline one-liner install card on top of the
@@ -12,17 +12,7 @@ import { Reveal } from "@/components/landing/motion-primitives";
 const INSTALL_CMD = "uvx --from code-tribunal tribunal-mcp";
 
 function HeadlineCommand() {
-  const [copied, setCopied] = useState(false);
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(INSTALL_CMD);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1200);
-    } catch {
-      /* clipboard unavailable (e.g. insecure context) — no-op */
-    }
-  }
+  const { copied, copy } = useCopyToClipboard();
 
   return (
     <div className="panel min-w-0 p-4 sm:p-5">
@@ -32,7 +22,7 @@ function HeadlineCommand() {
           {INSTALL_CMD}
         </pre>
         <button
-          onClick={copy}
+          onClick={() => copy(INSTALL_CMD)}
           aria-label={copied ? "Copied to clipboard" : "Copy install command to clipboard"}
           className="btn-tactile min-h-[44px] shrink-0 self-start rounded-lg border-2 border-[color:var(--ink)] bg-[color:var(--accent-soft)] px-4 py-2 font-mono text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--ink)] sm:self-auto"
         >

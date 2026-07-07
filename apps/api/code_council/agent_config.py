@@ -22,23 +22,20 @@ from __future__ import annotations
 
 import json
 
+from .tribunal.llm import DEFAULT_CHAIN, key_env_var
+
 SUPPORTED_AGENTS = ["openclaw", "hermes", "claude", "codex", "cursor"]
 
 KEY_PLACEHOLDER = "<your GROQ_API_KEY>"
 
-# Providers the tribunal reasoning chain understands (see tribunal/llm.py).
-SUPPORTED_PROVIDERS = ("groq", "cerebras", "gemini")
-
-_PROVIDER_KEY_ENV = {
-    "groq": "GROQ_API_KEY",
-    "cerebras": "CEREBRAS_API_KEY",
-    "gemini": "GEMINI_API_KEY",
-}
+# Providers the tribunal reasoning chain understands — derived from
+# tribunal/llm.py so a new provider only has to be added there.
+SUPPORTED_PROVIDERS = tuple(DEFAULT_CHAIN.split(","))
 
 
 def key_placeholder(provider: str) -> str:
     """Placeholder text for a provider key, e.g. ``<your CEREBRAS_API_KEY>``."""
-    return f"<your {_PROVIDER_KEY_ENV[provider]}>"
+    return f"<your {key_env_var(provider)}>"
 
 # The command every agent runs to launch the Tribunal MCP server.
 _COMMAND = "uvx"
@@ -59,11 +56,7 @@ _TARGET_PATHS = {
 # Agents whose config is a known file `tribunal init --write` can create.
 # Claude and Cursor are configured through their app UI (the targets above are
 # guidance, not paths), so we only ever print their block — never write a file.
-_WRITABLE_PATHS = {
-    "openclaw": "~/.openclaw/openclaw.json",
-    "hermes": "~/.hermes/config.yaml",
-    "codex": "~/.codex/config.toml",
-}
+_WRITABLE_AGENTS = frozenset({"openclaw", "hermes", "codex"})
 
 
 def config_target_path(agent: str) -> str:
@@ -74,7 +67,7 @@ def config_target_path(agent: str) -> str:
 def writable_config_path(agent: str) -> str | None:
     """Filesystem path ``--write`` may create, or ``None`` if the agent is
     configured through its app UI and has no file we should write."""
-    return _WRITABLE_PATHS.get(agent)
+    return _TARGET_PATHS[agent] if agent in _WRITABLE_AGENTS else None
 
 
 def _build_env(

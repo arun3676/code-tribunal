@@ -18,6 +18,7 @@ const NAV_TABS = [
 export function AppShell({ children }: PropsWithChildren) {
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [online, setOnline] = useState(true);
+  const [status, setStatus] = useState("");
   const pathname = usePathname();
 
   useEffect(() => {
@@ -30,6 +31,13 @@ export function AppShell({ children }: PropsWithChildren) {
     checkHealth();
     const interval = window.setInterval(checkHealth, 5000);
     return () => window.clearInterval(interval);
+  }, []);
+
+  // Council page broadcasts run progress ("council: 2/4 responding") here.
+  useEffect(() => {
+    const onStatus = (event: Event) => setStatus(String((event as CustomEvent).detail ?? ""));
+    window.addEventListener("code-council-status", onStatus);
+    return () => window.removeEventListener("code-council-status", onStatus);
   }, []);
 
   const availability = useMemo(() => models.filter((model) => model.available), [models]);
@@ -56,6 +64,12 @@ export function AppShell({ children }: PropsWithChildren) {
             </Link>
           </div>
           <div className="flex items-center gap-2">
+            {/* Desktop: live run status from the council page */}
+            {status ? (
+              <span className="hidden md:inline max-w-[220px] truncate font-mono text-[10px] uppercase tracking-[0.12em] text-fg-muted">
+                {status}
+              </span>
+            ) : null}
             {/* Desktop: per-model availability dots */}
             <div className="hidden md:flex items-center gap-2">
               {models.map((model) => (
