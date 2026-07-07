@@ -1,8 +1,0 @@
-diff --git a/auth/login.py b/auth/login.py
---- a/auth/login.py
-+++ b/auth/login.py
-@@ -1,4 +1,7 @@
- def login(request):
-+    limiter = RateLimiter(max_attempts=5)
-+    if limiter.exceeded(request.ip): return 429
-     return handle_login(request)
