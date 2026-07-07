@@ -84,6 +84,16 @@ export type TribunalFixture = {
   touched_domains: string[];
 };
 
+/** One-shot verdict result returned by POST /tribunal/verdict and /tribunal/review-pr. */
+export type TribunalVerdictResult = {
+  verdict: Verdict;
+  headline: string;
+  recruited: AgentName[];
+  findings: TribunalEvent[];
+  band_mode: "live" | "demo";
+  transcript: TribunalEvent[];
+};
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -181,6 +191,25 @@ export async function* tribunal(
     // Each SSE frame's data is a full TribunalEvent (its `type` mirrors the event name).
     yield frame.data as TribunalEvent;
   }
+}
+
+/**
+ * One-shot JSON verdict (no SSE). Reliable on flaky mobile networks — the whole
+ * trial runs server-side and returns the final verdict + transcript at once.
+ */
+export function tribunalVerdict(
+  payload: { fixture_id?: string; title?: string; ticket?: string; diff?: string; touched_domains?: string[] },
+) {
+  return request<TribunalVerdictResult>("/tribunal/verdict", { method: "POST", body: JSON.stringify(payload) });
+}
+
+/**
+ * Run the tribunal against a public GitHub PR URL. Same one-shot result shape as
+ * tribunalVerdict(). Backend resolves the PR diff + title, builds a docket, and
+ * runs the court.
+ */
+export function reviewPr(pr_url: string) {
+  return request<TribunalVerdictResult>("/tribunal/review-pr", { method: "POST", body: JSON.stringify({ pr_url }) });
 }
 
 export async function multimodal(payload: { file: File; prompt?: string; model?: string }) {

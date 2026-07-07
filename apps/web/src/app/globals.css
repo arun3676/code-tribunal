@@ -38,8 +38,13 @@
 
 html {
   color-scheme: light;
-  /* Gentle global scale-up for readability / video demos (rem-based sizing). */
-  font-size: 17px;
+  font-size: 16px;
+}
+@media (min-width: 768px) {
+  html {
+    /* Gentle global scale-up for readability / video demos (rem-based sizing). */
+    font-size: 17px;
+  }
 }
 
 body {
@@ -47,7 +52,7 @@ body {
   min-height: 100vh;
   color: var(--fg);
   font-family: var(--font-sans), sans-serif;
-  font-size: 15px;
+  font-size: 0.9375rem; /* 15px on mobile (16px base), ~15.9px at md+ (17px base) */
   background-color: var(--bg);
   background-image: repeating-linear-gradient(
     118deg,
@@ -80,11 +85,9 @@ textarea {
   font: inherit;
 }
 
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
-  outline: 2px solid var(--ink);
+/* Focus-visible: covers all interactive elements (buttons, links, inputs, custom roles) */
+:focus-visible {
+  outline: 2.5px solid var(--ink);
   outline-offset: 2px;
 }
 
@@ -152,6 +155,19 @@ textarea:focus-visible {
 .btn-tactile:active {
   transform: translate(3px, 3px);
   box-shadow: 0 0 0 var(--ink);
+}
+
+@media (max-width: 639px) {
+  .brutal,
+  .panel,
+  .glass {
+    border-width: 2px;
+    box-shadow: var(--shadow-ink-sm);
+    border-radius: 14px;
+  }
+  .btn-tactile {
+    box-shadow: var(--shadow-ink-sm);
+  }
 }
 
 /* ===== Tribunal War Room animations ===== */
@@ -253,3 +269,4 @@ textarea:focus-visible {
     animation: none !important;
   }
 }
+

@@ -22,14 +22,16 @@ export function AgentCard({ agent }: { agent: AgentName }) {
       </div>
 
       <div className="flex items-center gap-2.5">
-        <AgentAvatar agent={agent} size={46} active />
-        <div className="min-w-0">
+        <span className="shrink-0">
+          <AgentAvatar agent={agent} size={46} active />
+        </span>
+        <div className="min-w-0 flex-1">
           <div className="font-mono text-sm font-bold tracking-[0.12em]">{agent}</div>
           <div className="truncate text-[11px] font-semibold italic opacity-80">“{p.nickname}”</div>
         </div>
       </div>
 
-      <div className="mt-2 inline-block rounded-full border-2 border-[color:var(--ink)] bg-[color:var(--bg-elevated)] px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider">
+      <div className="mt-2 inline-block rounded-full border-2 border-[color:var(--ink)] bg-[color:var(--bg-elevated)] px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider">
         {p.role}
       </div>
 
@@ -37,9 +39,9 @@ export function AgentCard({ agent }: { agent: AgentName }) {
 
       <p className="mt-2 border-t-2 border-[color:var(--ink)] border-dotted pt-2 text-[11px] font-bold leading-snug">“{p.catchphrase}”</p>
 
-      <div className="mt-2 flex items-center justify-between">
-        <span className="font-mono text-[9px] font-bold uppercase tracking-wider opacity-70">{p.provider}</span>
-        {p.recruited ? <span className="rounded border-2 border-[color:var(--ink)] bg-[color:var(--warden)] px-1 font-mono text-[9px] font-bold uppercase tracking-wider">recruited live</span> : null}
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-1">
+        <span className="font-mono text-[10px] font-bold uppercase tracking-wider opacity-70">{p.provider}</span>
+        {p.recruited ? <span className="rounded border-2 border-[color:var(--ink)] bg-[color:var(--warden)] px-1 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider">recruited live</span> : null}
       </div>
     </div>
   );

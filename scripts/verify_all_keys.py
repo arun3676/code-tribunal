@@ -56,7 +56,8 @@ def test_band() -> None:
         )
         if resp.status_code == 200:
             data = resp.json()
-            name = data.get("name") or data.get("agent", {}).get("name") or "connected"
+            payload = data.get("data") if isinstance(data.get("data"), dict) else data
+            name = payload.get("name") or payload.get("handle") or "connected"
             ok("Band GET /agent/me", True, f"agent: {name}")
         else:
             ok("Band GET /agent/me", False, f"HTTP {resp.status_code}")
@@ -64,7 +65,9 @@ def test_band() -> None:
         ok("Band GET /agent/me", False, str(exc)[:100])
 
 
-def test_openai_compat(label: str, key: str, base_url: str, model: str) -> None:
+def test_openai_compat(label: str, key: str, base_url: str, model: str, max_tokens: int = 512) -> None:
+    # A 200 round-trip means the key + model are valid; reasoning models spend
+    # tokens on a hidden reasoning channel before emitting content.
     if not key:
         ok(label, False, "key missing")
         return
@@ -75,10 +78,11 @@ def test_openai_compat(label: str, key: str, base_url: str, model: str) -> None:
         resp = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": "Reply with exactly: pong"}],
-            max_tokens=16,
+            max_tokens=max_tokens,
         )
-        text = (resp.choices[0].message.content or "").strip()
-        ok(label, bool(text), text[:60] or "empty response")
+        msg = resp.choices[0].message
+        text = (msg.content or "").strip() or (getattr(msg, "reasoning", "") or "").strip()
+        ok(label, True, text[:60] or "200 OK (empty body)")
     except Exception as exc:
         ok(label, False, str(exc)[:120])
 
@@ -97,7 +101,7 @@ def main() -> int:
         "Cerebras",
         pick("CEREBRAS_API_KEY", "cerebras_api_key"),
         "https://api.cerebras.ai/v1",
-        "llama-3.3-70b",
+        "zai-glm-4.7",
     )
     return 0
 

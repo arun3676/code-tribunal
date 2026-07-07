@@ -11,9 +11,9 @@ const STATE_META: Record<Verdict["state"], { label: string; color: string }> = {
 export function VerdictStamp({ state, merge }: { state: Verdict["state"]; merge: Verdict["merge_decision"] }) {
   const meta = STATE_META[state];
   return (
-    <div className="flex items-center justify-center py-2">
+    <div className="flex items-center justify-center overflow-hidden py-3">
       <div
-        className="stamp-press relative flex h-36 w-36 flex-col items-center justify-center rounded-full text-center"
+        className="stamp-press relative flex h-28 w-28 flex-col items-center justify-center rounded-full text-center sm:h-36 sm:w-36"
         style={{
           border: `4px double ${meta.color}`,
           color: meta.color,
@@ -22,8 +22,8 @@ export function VerdictStamp({ state, merge }: { state: Verdict["state"]; merge:
         }}
       >
         <div className="absolute inset-1.5 rounded-full border-2" style={{ borderColor: `color-mix(in srgb, ${meta.color} 55%, transparent)` }} />
-        <span className="font-mono text-[9px] font-bold uppercase tracking-[0.3em] opacity-80">Tribunal</span>
-        <span className="mt-1 max-w-[7rem] font-mono text-[13px] font-bold leading-tight">{meta.label}</span>
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] opacity-80">Tribunal</span>
+        <span className="mt-1 max-w-[6rem] px-1 font-mono text-[12px] font-bold leading-tight sm:max-w-[7rem] sm:text-[13px]">{meta.label}</span>
         <span className="mt-1.5 rounded-sm border-2 px-1.5 py-0.5 font-mono text-[10px] font-bold tracking-widest" style={{ borderColor: meta.color }}>
           {merge}
         </span>

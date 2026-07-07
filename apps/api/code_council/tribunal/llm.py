@@ -23,9 +23,9 @@ from typing import Any
 from openai import OpenAI
 
 try:
-    import google.generativeai as genai
+    from google import genai as _google_genai
 except ImportError:  # pragma: no cover
-    genai = None
+    _google_genai = None
 
 logger = logging.getLogger("code_council.tribunal.llm")
 
@@ -38,7 +38,7 @@ DEFAULT_CHAIN = "groq,cerebras,gemini"
 # provider -> (api key env var, base url, model env var, default model)
 _OPENAI_COMPATIBLE: dict[str, tuple[str, str, str, str]] = {
     "groq": ("GROQ_API_KEY", "https://api.groq.com/openai/v1", "GROQ_MODEL", "llama-3.3-70b-versatile"),
-    "cerebras": ("CEREBRAS_API_KEY", "https://api.cerebras.ai/v1", "CEREBRAS_MODEL", "llama-3.3-70b"),
+    "cerebras": ("CEREBRAS_API_KEY", "https://api.cerebras.ai/v1", "CEREBRAS_MODEL", "zai-glm-4.7"),
 }
 
 _KEY_ENV: dict[str, str] = {
@@ -146,9 +146,9 @@ def _gemini_schema(schema: Any) -> Any:
 
 
 def _call_gemini(system: str, user: str, schema: dict, max_tokens: int) -> dict | None:
-    if genai is None:
-        raise RuntimeError("google-generativeai is not installed")
-    genai.configure(api_key=resolve_key("gemini"))
+    if _google_genai is None:
+        raise RuntimeError("google-genai is not installed")
+    client = _google_genai.Client(api_key=resolve_key("gemini"))
     model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     prompt = f"{system}\n\n{user}"
     base_config: dict[str, Any] = {
@@ -156,17 +156,19 @@ def _call_gemini(system: str, user: str, schema: dict, max_tokens: int) -> dict 
         "max_output_tokens": max_tokens,
         "temperature": 0.1,
     }
-    model = genai.GenerativeModel(model_name, system_instruction=system)
     try:
-        response = model.generate_content(
-            user,
-            generation_config={**base_config, "response_schema": _gemini_schema(schema)},
+        response = client.models.generate_content(
+            model=model_name,
+            contents=user,
+            config={**base_config, "system_instruction": system, "response_schema": _gemini_schema(schema)},
         )
     except Exception as exc:
-        # Some schemas aren't expressible in Gemini's response_schema dialect —
-        # fall back to plain JSON mime type and parse from text.
         logger.warning("Gemini response_schema call failed (%s); retrying without schema", exc)
-        response = model.generate_content(prompt, generation_config=base_config)
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=base_config,
+        )
     text = getattr(response, "text", None) or ""
     return _extract_json(text.strip())
 

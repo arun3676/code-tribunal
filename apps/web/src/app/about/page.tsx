@@ -7,13 +7,26 @@ export const metadata = {
 
 export default function AboutPage() {
   return (
-    <main className="mx-auto max-w-3xl space-y-8 px-4 py-10">
+    /*
+     * Use <article> not <main> — AppShell already provides the <main> landmark.
+     * Nested <main> elements are invalid HTML and break screen-reader navigation.
+     * Outer <main> provides pb-24 on mobile to clear the fixed bottom nav.
+     */
+    <article className="mx-auto max-w-3xl space-y-8 px-4 py-8 sm:py-10">
       <header>
-        <Link href="/" className="font-mono text-xs uppercase tracking-[0.2em] text-fg-muted hover:text-accent">
+        {/* Back link: inline-flex + min-h ensures ≥40px tap target on mobile */}
+        <Link
+          href="/"
+          className="inline-flex items-center min-h-[40px] font-mono text-xs uppercase tracking-[0.2em] text-fg-muted hover:text-accent"
+        >
           ← back
         </Link>
-        <h1 className="mt-4 font-mono text-2xl uppercase tracking-[0.16em] text-accent">Code Council Tribunal</h1>
-        <p className="mt-2 text-sm text-fg-muted">Multi-model analysis in the browser. Band-coordinated intent review in your coding agent.</p>
+        <h1 className="mt-2 font-mono text-xl sm:text-2xl uppercase tracking-[0.16em] text-accent">
+          Code Council Tribunal
+        </h1>
+        <p className="mt-2 text-sm leading-relaxed text-fg-muted">
+          Multi-model analysis in the browser. Band-coordinated intent review in your coding agent.
+        </p>
       </header>
 
       <section className="space-y-3">
@@ -51,7 +64,7 @@ export default function AboutPage() {
 
       <section className="space-y-3">
         <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-fg-muted">Stack</h2>
-        <ul className="grid gap-1 text-sm text-fg-muted sm:grid-cols-2">
+        <ul className="grid gap-1.5 text-sm text-fg-muted sm:grid-cols-2">
           <li>· Next.js 15 + Tailwind</li>
           <li>· FastAPI + SSE streaming</li>
           <li>· CLI + MCP server (uvx)</li>
@@ -59,14 +72,17 @@ export default function AboutPage() {
         </ul>
       </section>
 
-      <footer className="border-t border-[color:var(--border)] pt-4">
+      <footer className="border-t-2 border-[color:var(--ink)] pt-4">
+        {/* Inline-flex + min-h ensures ≥40px tap target on mobile */}
         <a
           href="https://github.com/arun3676/code-tribunal"
-          className="font-mono text-xs uppercase tracking-[0.2em] text-fg-muted hover:text-accent"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center min-h-[40px] font-mono text-xs uppercase tracking-[0.2em] text-fg-muted hover:text-accent"
         >
           source on github →
         </a>
       </footer>
-    </main>
+    </article>
   );
 }

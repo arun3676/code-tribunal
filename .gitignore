@@ -24,6 +24,12 @@ dist/
 # Local-only internal docs (e.g. Band migration plan) — never published
 docs/internal/
 
+# Explainer HTML files — local understanding aids, kept out of git
+docs/explainers/
+
+# Marketing content bank — internal social-post material, never published
+docs/marketing/
+
 # Node / frontend
 node_modules/
 .next/

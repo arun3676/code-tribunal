@@ -93,14 +93,51 @@ def format_pr_comment(result: dict) -> str:
     return "\n".join(lines)
 
 
-async def _fetch_pr_diff(owner: str, repo: str, number: int, token: str) -> str:
+def parse_pr_url(url: str) -> tuple[str, str, int]:
+    """Extract (owner, repo, number) from a GitHub PR URL.
+
+    Accepts https/http, optional .git suffix, and trailing fragments like
+    #pullrequestreview-…. Raises ValueError on no match.
+    """
+    import re as _re
+    m = _re.search(r"github\.com[:/]+([\w.-]+)/([\w.-]+?)(?:\.git)?/pull/(\d+)", url)
+    if not m:
+        raise ValueError(f"Cannot parse GitHub PR URL: {url!r}")
+    owner, repo, number = m.group(1), m.group(2), int(m.group(3))
+    return owner, repo, number
+
+
+async def _fetch_pr_diff(owner: str, repo: str, number: int, token: str | None = None) -> str:
+    # GitHub allows ~60 unauthenticated requests/hr/IP — sufficient for a demo.
+    # Pass GITHUB_TOKEN for private repos or to raise the rate limit to 5 000/hr.
+    headers: dict[str, str] = {"Accept": "application/vnd.github.v3.diff"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.get(
             f"{_GITHUB_API}/repos/{owner}/{repo}/pulls/{number}",
-            headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github.v3.diff"},
+            headers=headers,
         )
         resp.raise_for_status()
         return resp.text
+
+
+async def fetch_pr_meta(owner: str, repo: str, number: int, token: str | None = None) -> tuple[str, str]:
+    """Return (title, body) for a GitHub pull request.
+
+    Works unauthenticated for public repos; pass a token for private repos.
+    """
+    headers: dict[str, str] = {"Accept": "application/vnd.github+json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.get(
+            f"{_GITHUB_API}/repos/{owner}/{repo}/pulls/{number}",
+            headers=headers,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("title", ""), data.get("body") or ""
 
 
 async def _post_pr_comment(owner: str, repo: str, number: int, token: str, body: str) -> None:

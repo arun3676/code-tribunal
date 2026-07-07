@@ -10,6 +10,7 @@ from collections import defaultdict, deque
 from pathlib import Path
 from typing import AsyncIterator
 
+import httpx
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,7 +19,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from .analyzer import Analyzer
 from .fixes import FixSuggestionGenerator
-from .github_webhook import router as github_router
+from .github_webhook import router as github_router, parse_pr_url, _fetch_pr_diff, fetch_pr_meta
 from .multimodal import MultiModalAnalyzer
 from .scanners.performance import PerformanceAnalyzer
 from .scanners.security import SecurityAnalyzer
@@ -315,6 +316,51 @@ async def tribunal_verdict(payload: TribunalRequest) -> dict:
             raise HTTPException(status_code=400, detail="Provide fixture_id, or both ticket and diff.")
         docket = build_adhoc_docket(payload.ticket, payload.diff, payload.touched_domains, payload.title)
 
+    result = await run_trial_collect(docket)
+    result["headline"] = summarize_verdict(result.get("verdict"))
+    return result
+
+
+class ReviewPrRequest(BaseModel):
+    pr_url: str = Field(min_length=1)
+
+
+@app.post("/tribunal/review-pr")
+async def tribunal_review_pr(payload: ReviewPrRequest) -> dict:
+    """Fetch a GitHub PR's diff + metadata and run the tribunal headlessly.
+
+    Returns the same JSON verdict shape as ``POST /tribunal/verdict`` so the
+    frontend can treat both endpoints identically.  Works unauthenticated for
+    public PRs (GitHub allows ~60 req/hr/IP); set GITHUB_TOKEN in the
+    environment to handle private repos and to raise the rate limit to 5 000/hr.
+    """
+    try:
+        owner, repo, number = parse_pr_url(payload.pr_url)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid GitHub PR URL")
+
+    token: str | None = os.getenv("GITHUB_TOKEN") or None
+
+    try:
+        diff, (title, body) = await asyncio.gather(
+            _fetch_pr_diff(owner, repo, number, token),
+            fetch_pr_meta(owner, repo, number, token),
+        )
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 404:
+            raise HTTPException(
+                status_code=404,
+                detail="PR not found or private — set GITHUB_TOKEN for private repos",
+            )
+        raise HTTPException(
+            status_code=502,
+            detail=f"GitHub API error: {exc.response.status_code}",
+        )
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail=f"GitHub request failed: {exc}")
+
+    intent = body or title
+    docket = build_adhoc_docket(intent, diff, title=f"PR #{number}: {title}")
     result = await run_trial_collect(docket)
     result["headline"] = summarize_verdict(result.get("verdict"))
     return result

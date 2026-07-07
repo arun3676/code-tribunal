@@ -10,6 +10,7 @@ Subcommands:
     verify   full court — trust score, merge decision, blockers, ledger
     ghost    fast omission pre-check (requested-but-missing requirements)
     drift    fast scope-drift pre-check (changes no requirement authorized)
+    init     print the MCP wiring block for an agent (openclaw, hermes, …)
 """
 
 from __future__ import annotations
@@ -17,8 +18,16 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
+import subprocess
 import sys
 
+from .agent_config import (
+    SUPPORTED_AGENTS,
+    config_target_path,
+    render_agent_config,
+    writable_config_path,
+)
 from .tribunal.headless import (
     build_adhoc_docket,
     drift_check_docket,
@@ -49,16 +58,38 @@ def _split_domains(value: str | None) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def _resolve_diff(args: argparse.Namespace) -> str:
+    """Resolve the diff from ``--diff`` (file/stdin) or ``--git`` (run git diff).
+
+    ``--git`` makes the CLI agent-friendly: an AI agent can verify its own
+    uncommitted work in one call without capturing the diff itself.
+    ``--git`` with no value diffs against HEAD (all uncommitted changes);
+    ``--git <ref>`` diffs against that ref.
+    """
+
+    git_ref = getattr(args, "git", None)
+    if git_ref is not None:
+        proc = subprocess.run(
+            ["git", "diff", git_ref],
+            capture_output=True,
+            text=True,
+        )
+        if proc.returncode != 0:
+            raise RuntimeError(proc.stderr.strip() or "git diff failed")
+        return proc.stdout
+    return _read_source(args.diff)
+
+
 def _cmd_verify(args: argparse.Namespace) -> int:
     ticket = _read_source(args.ticket)
-    diff = _read_source(args.diff)
+    diff = _resolve_diff(args)
     docket = build_adhoc_docket(ticket, diff, _split_domains(args.domains), args.title)
     result = asyncio.run(run_trial_collect(docket))
     result["headline"] = summarize_verdict(result.get("verdict"))
 
     if args.json:
         print(json.dumps(result, indent=2))
-    else:
+    elif not getattr(args, "quiet", False):
         _print_verdict(result)
 
     verdict = result.get("verdict") or {}
@@ -91,10 +122,12 @@ def _print_verdict(result: dict) -> None:
 
 
 def _cmd_ghost(args: argparse.Namespace) -> int:
-    docket = build_adhoc_docket(_read_source(args.ticket), _read_source(args.diff))
+    docket = build_adhoc_docket(_read_source(args.ticket), _resolve_diff(args))
     missing = ghost_check_docket(docket)
     if args.json:
         print(json.dumps({"missing": missing, "count": len(missing), "conforms": not missing}, indent=2))
+    elif getattr(args, "quiet", False):
+        pass
     elif missing:
         print(f"{len(missing)} requested item(s) missing from the diff:")
         for item in missing:
@@ -105,10 +138,12 @@ def _cmd_ghost(args: argparse.Namespace) -> int:
 
 
 def _cmd_drift(args: argparse.Namespace) -> int:
-    docket = build_adhoc_docket(_read_source(args.ticket), _read_source(args.diff))
+    docket = build_adhoc_docket(_read_source(args.ticket), _resolve_diff(args))
     drifts = drift_check_docket(docket)
     if args.json:
         print(json.dumps({"drifts": drifts, "count": len(drifts), "in_scope": not drifts}, indent=2))
+    elif getattr(args, "quiet", False):
+        pass
     elif drifts:
         print(f"{len(drifts)} unauthorized change(s):")
         for item in drifts:
@@ -118,33 +153,99 @@ def _cmd_drift(args: argparse.Namespace) -> int:
     return EXIT_BLOCK if drifts else EXIT_OK
 
 
+def _cmd_init(args: argparse.Namespace) -> int:
+    """Print (or write) the MCP wiring block for a coding agent."""
+    try:
+        block = render_agent_config(args.agent, api_key=args.key)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_BLOCK
+
+    if args.write:
+        writable = writable_config_path(args.agent)
+        if writable is None:
+            # App-UI-configured agent (Claude/Cursor) — no file to write.
+            print(f"# {args.agent}: paste this into {config_target_path(args.agent)}", file=sys.stderr)
+            print(block)
+            return EXIT_OK
+        path = os.path.expanduser(writable)
+        if os.path.exists(path):
+            # Never clobber an existing config — it holds more than our server.
+            print(f"# {path} exists — merge this block in:", file=sys.stderr)
+            print(block)
+            return EXIT_OK
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(block + "\n")
+        print(f"wrote {args.agent} config to {path}", file=sys.stderr)
+        return EXIT_OK
+
+    print(block)
+    return EXIT_OK
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="tribunal",
         description="Intent-conformance review: did the diff build what the ticket asked for?",
+        epilog=(
+            "Exit codes: 0 = clear to merge, 1 = blocked / findings / error.\n"
+            "stdout = data (use --json for machine output), stderr = logs/errors.\n"
+            "Built to be called by AI agents in a write -> verify -> fix loop, e.g.\n"
+            "  tribunal verify --ticket ticket.md --git || <agent fixes and retries>"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
     def add_io(p: argparse.ArgumentParser) -> None:
         p.add_argument("--ticket", required=True, help="Ticket text file, or - for stdin")
-        p.add_argument("--diff", required=True, help="Unified diff file, or - for stdin")
+        src = p.add_mutually_exclusive_group(required=True)
+        src.add_argument("--diff", help="Unified diff file, or - for stdin")
+        src.add_argument(
+            "--git",
+            nargs="?",
+            const="HEAD",
+            default=None,
+            metavar="REF",
+            help="Run `git diff REF` for the diff (default HEAD = all uncommitted changes)",
+        )
+
+    quiet_help = "Suppress human output; rely on the exit code (for agent loops)"
 
     p_verify = sub.add_parser("verify", help="Full tribunal — verdict + trust score + ledger")
     add_io(p_verify)
     p_verify.add_argument("--domains", help="Comma-separated domain hints, e.g. auth,payments")
     p_verify.add_argument("--title", help="Optional docket title")
     p_verify.add_argument("--json", action="store_true", help="Emit the raw result as JSON")
+    p_verify.add_argument("--quiet", action="store_true", help=quiet_help)
     p_verify.set_defaults(func=_cmd_verify)
 
     p_ghost = sub.add_parser("ghost", help="Fast omission pre-check")
     add_io(p_ghost)
     p_ghost.add_argument("--json", action="store_true")
+    p_ghost.add_argument("--quiet", action="store_true", help=quiet_help)
     p_ghost.set_defaults(func=_cmd_ghost)
 
     p_drift = sub.add_parser("drift", help="Fast scope-drift pre-check")
     add_io(p_drift)
     p_drift.add_argument("--json", action="store_true")
+    p_drift.add_argument("--quiet", action="store_true", help=quiet_help)
     p_drift.set_defaults(func=_cmd_drift)
+
+    p_init = sub.add_parser(
+        "init",
+        help="Print the MCP wiring block for a coding agent",
+        description="Emit the ready-to-paste Tribunal MCP server block for an agent.",
+    )
+    p_init.add_argument("agent", choices=SUPPORTED_AGENTS, help="Target agent")
+    p_init.add_argument("--key", help="Bake in a real GROQ_API_KEY instead of the placeholder")
+    p_init.add_argument(
+        "--write",
+        action="store_true",
+        help="Write to the agent's config path (never clobbers an existing file)",
+    )
+    p_init.set_defaults(func=_cmd_init)
 
     return parser
 

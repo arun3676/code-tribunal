@@ -4,6 +4,8 @@ import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { analyze, council, getModels, multimodal, scan, type ModelInfo, type ScanResult } from "@/lib/api";
+import AgentIntegrations from "@/components/showcase/agent-integrations";
+import MobileLanding from "@/components/showcase/mobile-landing";
 
 const MonacoEditor = dynamic(async () => (await import("@monaco-editor/react")).default, {
   ssr: false,
@@ -87,6 +89,16 @@ function jaccard(left: string, right: string) {
 }
 
 export default function HomePage() {
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const m = matchMedia("(min-width: 768px)");
+    const f = () => setIsDesktop(m.matches);
+    f();
+    m.addEventListener("change", f);
+    return () => m.removeEventListener("change", f);
+  }, []);
+
   const [models, setModels] = useState<ModelInfo[]>([]);
   const availableModels = useMemo(() => models.filter((model) => model.available), [models]);
   const [view, setView] = useState<View>("solo");
@@ -389,6 +401,10 @@ export default function HomePage() {
   const councilCompleted = (Object.values(councilVerdicts) as CouncilEntry[]).filter((entry) => entry.done).length;
   const councilProgress = councilModels.length ? (councilCompleted / councilModels.length) * 100 : 0;
 
+  if (!isDesktop) {
+    return <MobileLanding />;
+  }
+
   return (
     <div className="space-y-5 pb-16">
       <section className="panel rounded-2xl p-5">
@@ -405,7 +421,8 @@ export default function HomePage() {
               <button
                 key={entry}
                 onClick={() => setView(entry)}
-                className={`rounded-lg px-4 py-2 font-mono text-xs uppercase tracking-[0.18em] ${view === entry ? "bg-[color:var(--accent-soft)] text-accent" : "text-fg-muted"}`}
+                aria-pressed={view === entry}
+                className={`min-h-[40px] rounded-lg px-4 py-2 font-mono text-xs uppercase tracking-[0.18em] ${view === entry ? "bg-[color:var(--accent-soft)] text-accent" : "text-fg-muted"}`}
               >
                 {entry}
               </button>
@@ -414,14 +431,23 @@ export default function HomePage() {
         </div>
       </section>
 
+      <AgentIntegrations />
+
       <section className="grid gap-4 md:grid-cols-2">
         <div className="panel rounded-2xl p-4">
           <div className="font-mono text-[11px] uppercase tracking-[0.2em] text-fg-muted">Drop Image</div>
+          {/* flex-col on all sizes up to md; min-w-0 on flex children prevents overflow */}
           <div className="mt-3 flex flex-col gap-3 md:flex-row">
-            <div className="flex-1 rounded-xl border border-dashed border-[color:var(--border-hot)] p-4">
+            <div className="min-w-0 flex-1 rounded-xl border border-dashed border-[color:var(--border-hot)] p-4">
+              {/* Associate file input with a visible label for accessibility */}
+              <label htmlFor="image-upload" className="block text-sm text-fg-muted">
+                Choose a file
+              </label>
               <input
+                id="image-upload"
                 type="file"
                 accept="image/png,image/jpeg,image/jpg"
+                className="mt-1 w-full text-sm text-fg-muted"
                 onChange={(event) => {
                   const file = event.target.files?.[0];
                   if (!file) return;
@@ -429,42 +455,68 @@ export default function HomePage() {
                   setImagePreview(URL.createObjectURL(file));
                 }}
               />
-              <p className="mt-2 text-sm text-fg-muted">Paste an image anywhere on the page or choose a file.</p>
-              {imagePreview ? <img src={imagePreview} alt="Upload preview" className="mt-4 max-h-48 rounded-lg border border-[color:var(--border)] object-contain" /> : null}
+              <p className="mt-2 text-sm text-fg-muted">Or paste an image anywhere on the page.</p>
+              {imagePreview ? (
+                <img
+                  src={imagePreview}
+                  alt="Upload preview"
+                  className="mt-4 max-h-48 w-full rounded-lg border border-[color:var(--border)] object-contain"
+                />
+              ) : null}
             </div>
-            <div className="flex-1 space-y-3">
-              <select value={imageModel} onChange={(event) => setImageModel(event.target.value)} className="w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--bg-overlay)] px-3 py-2 text-sm">
-                {availableModels.filter((entry) => entry.vision).map((entry) => (
-                  <option key={entry.id} value={entry.id}>{entry.display}</option>
-                ))}
-              </select>
-              <textarea value={imagePrompt} onChange={(event) => setImagePrompt(event.target.value)} className="h-28 w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--bg-overlay)] px-3 py-2 text-sm" />
-              <button onClick={() => void handleImageAnalyze()} disabled={!imageFile || imageLoading} className="rounded-lg border border-[color:var(--border-hot)] bg-[color:var(--accent-soft)] px-4 py-2 text-sm text-fg disabled:opacity-40">
+            <div className="min-w-0 flex-1 space-y-3">
+              <label className="block">
+                <span className="sr-only">Vision model</span>
+                <select
+                  value={imageModel}
+                  onChange={(event) => setImageModel(event.target.value)}
+                  className="w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--bg-overlay)] px-3 py-2 text-sm"
+                >
+                  {availableModels.filter((entry) => entry.vision).map((entry) => (
+                    <option key={entry.id} value={entry.id}>{entry.display}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="sr-only">Analysis prompt</span>
+                <textarea
+                  value={imagePrompt}
+                  onChange={(event) => setImagePrompt(event.target.value)}
+                  className="h-28 w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--bg-overlay)] px-3 py-2 text-sm"
+                />
+              </label>
+              {/* min-h-[40px] ensures touch-friendly tap target */}
+              <button
+                onClick={() => void handleImageAnalyze()}
+                disabled={!imageFile || imageLoading}
+                className="min-h-[40px] w-full rounded-lg border border-[color:var(--border-hot)] bg-[color:var(--accent-soft)] px-4 py-2 text-sm text-fg disabled:opacity-40 sm:w-auto"
+              >
                 {imageLoading ? "Analyzing..." : "Analyze Image"}
               </button>
             </div>
           </div>
           {imageResult ? (
             <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--bg-overlay)] p-4">
+              <div className="min-w-0 rounded-xl border border-[color:var(--border)] bg-[color:var(--bg-overlay)] p-4">
                 <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-fg-muted">Extracted Code</div>
-                <pre className="mt-3 overflow-auto whitespace-pre-wrap font-mono text-xs text-fg">{imageResult.code_extracted || "No code extracted."}</pre>
+                {/* max-h clamps very large code blocks; overflow-x-auto handles wide lines */}
+                <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-xs text-fg">{imageResult.code_extracted || "No code extracted."}</pre>
                 {imageResult.code_extracted ? (
                   <button
                     onClick={() => {
                       setCode(imageResult.code_extracted);
                       setView("solo");
                     }}
-                    className="mt-3 rounded-lg border border-[color:var(--border-hot)] px-3 py-2 text-xs font-mono uppercase tracking-[0.16em] text-accent"
+                    className="mt-3 min-h-[40px] rounded-lg border border-[color:var(--border-hot)] px-3 py-2 text-xs font-mono uppercase tracking-[0.16em] text-accent"
                   >
                     Analyze This
                   </button>
                 ) : null}
               </div>
-              <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--bg-overlay)] p-4">
+              <div className="min-w-0 rounded-xl border border-[color:var(--border)] bg-[color:var(--bg-overlay)] p-4">
                 <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-fg-muted">Suggestions</div>
                 <div className="mt-3 space-y-2 text-sm text-fg-muted">
-                  {imageResult.suggestions.length ? imageResult.suggestions.map((item) => <div key={item}>- {item}</div>) : <div>No suggestions extracted.</div>}
+                  {imageResult.suggestions.length ? imageResult.suggestions.map((item) => <div key={item} className="break-words">- {item}</div>) : <div>No suggestions extracted.</div>}
                 </div>
               </div>
             </div>
@@ -484,7 +536,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className={`grid grid-cols-1 gap-4 ${view === "solo" ? "lg:grid-cols-[1.6fr_1fr]" : "lg:grid-cols-2"}`}>
+      {/* md:grid-cols-1 explicit so 768-1023px stays stacked; lg splits into two columns */}
+      <section className={`grid grid-cols-1 gap-4 md:grid-cols-1 ${view === "solo" ? "lg:grid-cols-[1.6fr_1fr]" : "lg:grid-cols-2"}`}>
         <div className="space-y-4">
           <div className="panel rounded-2xl p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -548,16 +601,26 @@ export default function HomePage() {
 
           {view === "solo" ? (
             <div className="panel flex flex-wrap items-center gap-3 rounded-2xl p-4">
-              <select value={model} onChange={(event) => setModel(event.target.value)} className="w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--bg-overlay)] px-3 py-2 text-sm sm:w-auto sm:min-w-56">
+              {/* flex-1 + min-w-[160px] allows the select to grow while still shrinking on narrow viewports */}
+              <select
+                value={model}
+                onChange={(event) => setModel(event.target.value)}
+                aria-label="Solo analysis model"
+                className="min-h-[40px] min-w-[160px] flex-1 rounded-lg border border-[color:var(--border)] bg-[color:var(--bg-overlay)] px-3 py-2 text-sm"
+              >
                 {availableModels.map((entry) => (
                   <option key={entry.id} value={entry.id}>{entry.display}</option>
                 ))}
               </select>
-              <button onClick={() => void runSolo()} disabled={!code.trim() || !model || isSoloRunning} className="rounded-lg border border-[color:var(--border-hot)] bg-[color:var(--accent-soft)] px-5 py-2 text-sm text-fg disabled:opacity-40">
+              <button
+                onClick={() => void runSolo()}
+                disabled={!code.trim() || !model || isSoloRunning}
+                className="min-h-[40px] rounded-lg border border-[color:var(--border-hot)] bg-[color:var(--accent-soft)] px-5 py-2 text-sm text-fg disabled:opacity-40"
+              >
                 {isSoloRunning ? "ANALYZING" : "ANALYZE"}
               </button>
               {isSoloRunning ? (
-                <button onClick={stopSolo} className="rounded-lg border border-[color:var(--danger)] px-4 py-2 text-sm text-danger">STOP</button>
+                <button onClick={stopSolo} className="min-h-[40px] rounded-lg border border-[color:var(--danger)] px-4 py-2 text-sm text-danger">STOP</button>
               ) : null}
             </div>
           ) : (
@@ -587,10 +650,16 @@ export default function HomePage() {
                 <div className="h-full bg-[color:var(--accent)] transition-all" style={{ width: `${councilProgress}%` }} />
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <button onClick={() => void runCouncil()} disabled={!code.trim() || councilModels.length < 2 || isCouncilRunning} className="rounded-lg border border-[color:var(--border-hot)] bg-[color:var(--accent-soft)] px-5 py-2 text-sm text-fg disabled:opacity-40">
+                <button
+                  onClick={() => void runCouncil()}
+                  disabled={!code.trim() || councilModels.length < 2 || isCouncilRunning}
+                  className="min-h-[40px] rounded-lg border border-[color:var(--border-hot)] bg-[color:var(--accent-soft)] px-5 py-2 text-sm text-fg disabled:opacity-40"
+                >
                   {isCouncilRunning ? `RUNNING — ${councilCompleted}/${councilModels.length} complete` : "ANALYZE COUNCIL"}
                 </button>
-                {isCouncilRunning ? <button onClick={stopCouncil} className="rounded-lg border border-[color:var(--danger)] px-4 py-2 text-sm text-danger">STOP</button> : null}
+                {isCouncilRunning ? (
+                  <button onClick={stopCouncil} className="min-h-[40px] rounded-lg border border-[color:var(--danger)] px-4 py-2 text-sm text-danger">STOP</button>
+                ) : null}
               </div>
             </div>
           )}
@@ -599,12 +668,13 @@ export default function HomePage() {
         <div className="space-y-4">
           {view === "solo" ? (
             <div className="panel rounded-2xl p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
                   <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-fg-muted">Verdict</div>
-                  <div className="mt-2 text-lg font-semibold">{availableModels.find((entry) => entry.id === model)?.display ?? "Select a model"}</div>
+                  {/* truncate prevents long model display names from overflowing the verdict panel */}
+                  <div className="mt-2 truncate text-lg font-semibold">{availableModels.find((entry) => entry.id === model)?.display ?? "Select a model"}</div>
                 </div>
-                <div className="font-mono text-sm text-fg-muted">{isSoloRunning ? `${(soloLatencyMs / 1000).toFixed(1)}s` : soloVerdict.durationMs ? `${(soloVerdict.durationMs / 1000).toFixed(1)}s` : "idle"}</div>
+                <div className="shrink-0 font-mono text-sm text-fg-muted">{isSoloRunning ? `${(soloLatencyMs / 1000).toFixed(1)}s` : soloVerdict.durationMs ? `${(soloVerdict.durationMs / 1000).toFixed(1)}s` : "idle"}</div>
               </div>
               {scanEnabled && scanResult ? (
                 <div className="mt-4 rounded-xl border border-[color:var(--border)] bg-[color:var(--bg-overlay)] p-4">
@@ -613,13 +683,21 @@ export default function HomePage() {
                     <div>
                       <div className="text-danger">Security · risk {scanResult.security.risk_score}</div>
                       <div className="mt-1 space-y-1 text-fg-muted">
-                        {scanResult.security.vulnerabilities.length ? scanResult.security.vulnerabilities.map((item) => <div key={`${item.vulnerability_type}-${item.line_number}`}>- {item.description}</div>) : <div>No security findings.</div>}
+                        {scanResult.security.vulnerabilities.length
+                          ? scanResult.security.vulnerabilities.map((item) => (
+                              <div key={`${item.vulnerability_type}-${item.line_number}`} className="break-words">- {item.description}</div>
+                            ))
+                          : <div>No security findings.</div>}
                       </div>
                     </div>
                     <div>
                       <div className="text-warning">Performance · score {scanResult.performance.overall_score}</div>
                       <div className="mt-1 space-y-1 text-fg-muted">
-                        {scanResult.performance.issues.length ? scanResult.performance.issues.map((item) => <div key={`${item.issue_type}-${item.line_number}`}>- {item.description}</div>) : <div>No performance findings.</div>}
+                        {scanResult.performance.issues.length
+                          ? scanResult.performance.issues.map((item) => (
+                              <div key={`${item.issue_type}-${item.line_number}`} className="break-words">- {item.description}</div>
+                            ))
+                          : <div>No performance findings.</div>}
                       </div>
                     </div>
                   </div>
@@ -637,13 +715,17 @@ export default function HomePage() {
                   <section>
                     <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-fg-muted">Bugs</div>
                     <div className="mt-2 space-y-2 text-sm text-fg-muted">
-                      {soloVerdict.bugs.length ? soloVerdict.bugs.map((item) => <div key={item} className="text-danger">- {item}</div>) : <div className="text-fg-dim">no bugs detected</div>}
+                      {soloVerdict.bugs.length
+                        ? soloVerdict.bugs.map((item) => <div key={item} className="break-words text-danger">- {item}</div>)
+                        : <div className="text-fg-dim">no bugs detected</div>}
                     </div>
                   </section>
                   <section>
                     <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-fg-muted">Suggestions</div>
                     <div className="mt-2 space-y-2 text-sm text-fg-muted">
-                      {soloVerdict.suggestions.length ? soloVerdict.suggestions.map((item) => <div key={item} className="text-fg">- {item}</div>) : <div className="text-fg-dim">no suggestions detected</div>}
+                      {soloVerdict.suggestions.length
+                        ? soloVerdict.suggestions.map((item) => <div key={item} className="break-words text-fg">- {item}</div>)
+                        : <div className="text-fg-dim">no suggestions detected</div>}
                     </div>
                   </section>
                   {mode === "thorough" ? (
@@ -652,9 +734,10 @@ export default function HomePage() {
                       <div className="mt-2 space-y-3">
                         {soloVerdict.fixes.length ? soloVerdict.fixes.map((item) => (
                           <div key={item.issue_id} className="rounded-xl border border-[color:var(--border)] bg-[color:var(--bg-overlay)] p-3">
-                            <div className="font-mono text-xs uppercase tracking-[0.14em] text-accent">{item.title}</div>
-                            <div className="mt-2 text-sm text-fg-muted">{item.explanation}</div>
-                            <pre className="mt-3 overflow-auto whitespace-pre-wrap rounded-lg bg-black/30 p-3 font-mono text-xs text-fg">{item.diff}</pre>
+                            <div className="break-words font-mono text-xs uppercase tracking-[0.14em] text-accent">{item.title}</div>
+                            <div className="mt-2 break-words text-sm text-fg-muted">{item.explanation}</div>
+                            {/* max-h prevents long diffs from consuming entire viewport height */}
+                            <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-black/30 p-3 font-mono text-xs text-fg">{item.diff}</pre>
                           </div>
                         )) : <div className="text-sm text-fg-dim">No fixes generated.</div>}
                       </div>
@@ -662,7 +745,8 @@ export default function HomePage() {
                   ) : null}
                   <details className="rounded-xl border border-[color:var(--border)] bg-[color:var(--bg-overlay)] p-4">
                     <summary className="cursor-pointer font-mono text-[11px] uppercase tracking-[0.18em] text-fg-muted">Raw Stream</summary>
-                    <pre className="mt-3 overflow-auto whitespace-pre-wrap font-mono text-xs text-fg">{soloVerdict.raw || "No raw stream yet."}</pre>
+                    {/* max-h + overflow-auto clamps runaway streaming output */}
+                    <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap font-mono text-xs text-fg">{soloVerdict.raw || "No raw stream yet."}</pre>
                   </details>
                   {soloVerdict.error ? <div className="rounded-xl border border-[color:var(--danger)] px-4 py-3 text-sm text-danger">{soloVerdict.error}</div> : null}
                 </div>
@@ -679,38 +763,47 @@ export default function HomePage() {
                   <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-fg-muted">Consensus Ribbon</div>
                   <div className="font-mono text-xs text-fg-muted">{isCouncilRunning ? `${((Date.now() - councilStartedAt) / 1000).toFixed(1)}s` : "idle"}</div>
                 </div>
-                <div className="mt-3 rounded-full px-4 py-3 font-mono text-sm uppercase tracking-[0.2em] text-black" style={{ background: consensus?.color ?? "var(--bg-overlay)", color: consensus ? "#041108" : "var(--fg-muted)" }}>
+                {/* use token --ink for text instead of bare `text-black`; keep the inline color override for contrast on pastel bg */}
+                <div className="mt-3 rounded-full px-4 py-3 font-mono text-sm uppercase tracking-[0.2em] text-[color:var(--ink)]" style={{ background: consensus?.color ?? "var(--bg-overlay)", color: consensus ? "var(--ink)" : "var(--fg-muted)" }}>
                   {consensus ? `${consensus.label} · spread ${consensus.spread.toFixed(1)}` : "Waiting for model scores"}
                 </div>
               </div>
-              <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${councilModels.length >= 4 ? "xl:grid-cols-4" : councilModels.length === 3 ? "xl:grid-cols-3" : ""}`}>
+              <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${councilModels.length >= 4 ? "xl:grid-cols-4" : councilModels.length === 3 ? "lg:grid-cols-3" : ""}`}>
                 {councilModels.map((entry) => {
                   const verdict = councilVerdicts[entry] ?? { ...emptyVerdict(), model: entry, expanded: false };
                   const modelInfo = models.find((item) => item.id === entry);
                   return (
-                    <div key={entry} className="panel rounded-2xl p-4" style={{ borderLeft: `2px solid ${modelInfo?.color ?? "var(--border-hot)"}` }}>
+                    <div key={entry} className="panel min-w-0 rounded-2xl p-4" style={{ borderLeft: `4px solid ${modelInfo?.color ?? "var(--border-hot)"}` }}>
                       <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-fg-muted">{modelInfo?.display ?? entry}</div>
+                        <div className="min-w-0">
+                          {/* truncate prevents long model display names from overflowing card */}
+                          <div className="truncate font-mono text-[11px] uppercase tracking-[0.18em] text-fg-muted">{modelInfo?.display ?? entry}</div>
                           <div className="mt-1 font-mono text-xs text-fg-muted">{verdict.durationMs ? `${(verdict.durationMs / 1000).toFixed(1)}s` : verdict.done ? "done" : "streaming"}</div>
                         </div>
-                        <button onClick={() => setCouncilVerdicts((current) => ({ ...current, [entry]: { ...current[entry], expanded: !current[entry]?.expanded } }))} className="rounded-md border border-[color:var(--border)] px-3 py-2 font-mono text-xs text-fg-muted">v</button>
+                        <button
+                          onClick={() => setCouncilVerdicts((current) => ({ ...current, [entry]: { ...current[entry], expanded: !current[entry]?.expanded } }))}
+                          aria-label={verdict.expanded ? `Collapse ${modelInfo?.display ?? entry} details` : `Expand ${modelInfo?.display ?? entry} details`}
+                          aria-expanded={verdict.expanded}
+                          className="shrink-0 rounded-md border border-[color:var(--border)] px-3 py-2 font-mono text-xs text-fg-muted"
+                        >
+                          {verdict.expanded ? "▲" : "▼"}
+                        </button>
                       </div>
                       <div className="mt-3 h-4 overflow-hidden rounded-full bg-[color:var(--bg-overlay)]">
-                        <div className="h-full bg-[color:var(--accent)] transition-all duration-700" style={{ width: `${verdict.score ?? 0}%` }} />
+                        <div className="meter-fill h-full bg-[color:var(--accent)] transition-all duration-700" style={{ width: `${verdict.score ?? 0}%` }} />
                       </div>
                       <div className="mt-2 font-mono text-2xl">{verdict.score ?? "--"}</div>
-                      <div className="mt-3 flex gap-2 text-[11px] uppercase tracking-[0.16em]">
+                      <div className="mt-3 flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.16em]">
                         <span className="rounded-full border border-[color:var(--border)] px-2 py-1 text-danger">bugs {verdict.bugs.length}</span>
                         <span className="rounded-full border border-[color:var(--border)] px-2 py-1 text-accent">tips {verdict.suggestions.length}</span>
                       </div>
                       {verdict.expanded ? (
                         <div className="mt-4 space-y-3 text-sm text-fg-muted">
-                          <div>{verdict.bugs.length ? verdict.bugs.map((item) => <div key={item} className="text-danger">- {item}</div>) : <div>No bugs detected.</div>}</div>
-                          <div>{verdict.suggestions.length ? verdict.suggestions.map((item) => <div key={item}>- {item}</div>) : <div>No suggestions.</div>}</div>
+                          <div>{verdict.bugs.length ? verdict.bugs.map((item) => <div key={item} className="break-words text-danger">- {item}</div>) : <div>No bugs detected.</div>}</div>
+                          <div>{verdict.suggestions.length ? verdict.suggestions.map((item) => <div key={item} className="break-words">- {item}</div>) : <div>No suggestions.</div>}</div>
                         </div>
                       ) : null}
-                      {verdict.error ? <div className="mt-3 rounded-xl border border-[color:var(--danger)] px-3 py-2 text-sm text-danger">MODEL UNRESPONSIVE</div> : null}
+                      {verdict.error ? <div className="mt-3 rounded-xl border border-[color:var(--danger)] px-3 py-2 text-sm text-danger" role="alert">MODEL UNRESPONSIVE</div> : null}
                     </div>
                   );
                 })}
@@ -718,18 +811,25 @@ export default function HomePage() {
               {agreementRows.length ? (
                 <div className="panel rounded-2xl p-4">
                   <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-fg-muted">Agreement Matrix</div>
-                  <div className="mt-3 overflow-auto">
-                    <table className="min-w-full border-separate border-spacing-y-2 text-sm">
+                  {/* overflow-x-auto on a constrained container prevents the table from stretching the panel */}
+                  <div className="mt-3 w-full overflow-x-auto">
+                    <table className="w-full min-w-[360px] border-separate border-spacing-y-2 text-sm">
                       <thead>
                         <tr className="font-mono text-[11px] uppercase tracking-[0.18em] text-fg-muted">
+                          {/* Issue column takes remaining space; model columns are narrow fixed */}
                           <th className="px-3 py-2 text-left">Issue</th>
-                          {councilModels.map((entry) => <th key={entry} className="px-3 py-2 text-left">{models.find((item) => item.id === entry)?.provider ?? entry}</th>)}
+                          {councilModels.map((entry) => (
+                            <th key={entry} className="whitespace-nowrap px-3 py-2 text-left">
+                              {models.find((item) => item.id === entry)?.provider ?? entry}
+                            </th>
+                          ))}
                         </tr>
                       </thead>
                       <tbody>
                         {agreementRows.map((row) => (
                           <tr key={row.label} className="bg-[color:var(--bg-elevated)]">
-                            <td className="rounded-l-xl px-3 py-3 text-fg">{row.label}</td>
+                            {/* max-w-[220px] + break-words prevents very long issue text from blowing layout */}
+                            <td className="max-w-[220px] break-words rounded-l-xl px-3 py-3 text-fg">{row.label}</td>
                             {councilModels.map((entry, index) => (
                               <td key={`${row.label}-${entry}`} className={`px-3 py-3 font-mono ${index === councilModels.length - 1 ? "rounded-r-xl" : ""}`}>
                                 {councilVerdicts[entry]?.error ? <span className="text-fg-dim">—</span> : row.models[entry] ? <span className="text-accent">✓</span> : <span className="text-fg-dim">✗</span>}
@@ -749,13 +849,29 @@ export default function HomePage() {
       </section>
 
       {showShortcuts ? (
-        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/65 px-4" onClick={() => setShowShortcuts(false)}>
+        /* backdrop — click outside to dismiss */
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Keyboard shortcuts"
+          className="fixed inset-0 z-30 flex items-center justify-center bg-black/65 px-4"
+          onClick={() => setShowShortcuts(false)}
+        >
           <div className="panel w-full max-w-xl rounded-2xl p-5" onClick={(event) => event.stopPropagation()}>
-            <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-fg-muted">man shortcuts</div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-fg-muted">man shortcuts</div>
+              <button
+                onClick={() => setShowShortcuts(false)}
+                aria-label="Close shortcuts overlay"
+                className="rounded-md border border-[color:var(--border)] px-3 py-1 font-mono text-xs text-fg-muted focus-visible:outline-2 focus-visible:outline-[color:var(--ink)]"
+              >
+                ✕
+              </button>
+            </div>
             <div className="mt-4 space-y-3 font-mono text-sm text-fg">
-              <div>Ctrl/Cmd + Enter ...... Run current view</div>
-              <div>Ctrl/Cmd + K .......... Switch to next available model</div>
-              <div>? ..................... Toggle this overlay</div>
+              <div><span className="kbd mr-3">Ctrl/Cmd + Enter</span> Run current view</div>
+              <div><span className="kbd mr-3">Ctrl/Cmd + K</span> Switch to next available model</div>
+              <div><span className="kbd mr-3">?</span> Toggle this overlay</div>
             </div>
           </div>
         </div>

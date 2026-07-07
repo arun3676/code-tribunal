@@ -1,0 +1,17 @@
+{
+  "mcp": {
+    "servers": {
+      "tribunal": {
+        "command": "uvx",
+        "args": [
+          "--from",
+          "code-tribunal",
+          "tribunal-mcp"
+        ],
+        "env": {
+          "GROQ_API_KEY": "<your GROQ_API_KEY>"
+        }
+      }
+    }
+  }
+}

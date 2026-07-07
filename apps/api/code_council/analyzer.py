@@ -14,9 +14,9 @@ from .prompts import build_analysis_prompt
 from .utils import parse_llm_response, timer_decorator
 
 try:
-    import google.generativeai as genai
+    from google import genai as _google_genai
 except ImportError:  # pragma: no cover
-    genai = None
+    _google_genai = None
 
 
 load_dotenv()
@@ -45,9 +45,9 @@ MODEL_REGISTRY: tuple[ModelDescriptor, ...] = (
         base_url=_GROQ_BASE_URL,
     ),
     ModelDescriptor(
-        id="llama-3.3-70b",
+        id="zai-glm-4.7",
         provider="cerebras",
-        display="Cerebras Llama",
+        display="Cerebras GLM",
         color="#F58220",
         env_var="CEREBRAS_API_KEY",
         base_url=_CEREBRAS_BASE_URL,
@@ -185,14 +185,13 @@ class Analyzer:
         return (response.choices[0].message.content or "").strip()
 
     def _generate_with_gemini(self, descriptor: ModelDescriptor, prompt: str) -> str:
-        if genai is None:
-            raise RuntimeError("google-generativeai is not installed")
+        if _google_genai is None:
+            raise RuntimeError("google-genai is not installed")
         api_key = os.getenv(descriptor.env_var)
         if not api_key:
             raise ValueError(f"API key missing for {descriptor.display}")
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(descriptor.id)
-        response = model.generate_content(prompt)
+        client = _google_genai.Client(api_key=api_key)
+        response = client.models.generate_content(model=descriptor.id, contents=prompt)
         text = getattr(response, "text", None)
         if text:
             return text.strip()

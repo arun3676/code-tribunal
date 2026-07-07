@@ -30,7 +30,7 @@ export function TrustMeter({ score }: Props) {
         {/* needle */}
         <div className="absolute top-1/2 z-20 h-5 w-1 -translate-y-1/2 rounded-sm border border-[color:var(--ink)]" style={{ left: `calc(${pct}% - 2px)`, background: color }} />
       </div>
-      <div className="mt-1 flex justify-between font-mono text-[9px] font-bold uppercase tracking-wider text-fg-dim">
+      <div className="mt-1 flex justify-between font-mono text-[10px] font-bold uppercase tracking-wider text-fg-dim">
         <span>Block</span>
         <span>Conditions</span>
         <span>Clear</span>

@@ -87,6 +87,18 @@ tribunal verify --ticket ticket.md --diff change.diff
 
 MCP tools exposed: `verify_intent_conformance` (full court), `ghost_check` (fast omission pre-check), `drift_check` (fast scope-drift pre-check).
 
+### Coding agents (OpenClaw · Hermes · …)
+
+Both [OpenClaw](https://docs.openclaw.ai/) and [Hermes](https://hermes-agent.nousresearch.com/docs/) are MCP clients, so the same server wires straight in. Generate the right block for any agent:
+
+```bash
+tribunal init openclaw   # ~/.openclaw/openclaw.json
+tribunal init hermes     # ~/.hermes/config.yaml (+ a bundled Open Skill)
+tribunal init claude     # mcpServers JSON
+```
+
+Per-agent guides, sample configs, and the Hermes Open Skill live in [`integrations/`](integrations/).
+
 ## Band coordination
 
 Tribunal uses Band as the active coordination layer:

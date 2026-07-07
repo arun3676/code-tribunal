@@ -25,18 +25,22 @@ def test_gemini(key: str) -> None:
         status("Gemini", False, "key missing")
         return
     try:
-        import google.generativeai as genai
+        from google import genai
 
-        genai.configure(api_key=key)
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        resp = model.generate_content("Reply with exactly: pong")
+        client = genai.Client(api_key=key)
+        resp = client.models.generate_content(
+            model="gemini-2.5-flash", contents="Reply with exactly: pong"
+        )
         text = (resp.text or "").strip()
-        status("Gemini", "pong" in text.lower(), text[:80] or "empty response")
+        status("Gemini", bool(text), text[:80] or "empty response")
     except Exception as exc:
         status("Gemini", False, str(exc)[:120])
 
 
-def test_openai_compat(label: str, key: str, base_url: str, model: str) -> None:
+def test_openai_compat(label: str, key: str, base_url: str, model: str, max_tokens: int = 512) -> None:
+    # A 200 round-trip means the key + model are valid. Reasoning models
+    # (Cerebras GLM) and diffusion models (Mercury) spend tokens before
+    # emitting content, so success is "got a response", not "said pong".
     if not key:
         status(label, False, "key missing")
         return
@@ -47,10 +51,11 @@ def test_openai_compat(label: str, key: str, base_url: str, model: str) -> None:
         resp = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": "Reply with exactly: pong"}],
-            max_tokens=8,
+            max_tokens=max_tokens,
         )
-        text = (resp.choices[0].message.content or "").strip()
-        status(label, "pong" in text.lower(), text[:80] or "empty response")
+        msg = resp.choices[0].message
+        text = (msg.content or "").strip() or (getattr(msg, "reasoning", "") or "").strip()
+        status(label, True, text[:80] or "200 OK (empty body)")
     except Exception as exc:
         status(label, False, str(exc)[:120])
 
@@ -67,7 +72,7 @@ def main() -> int:
         "Cerebras",
         os.getenv("CEREBRAS_API_KEY", "").strip(),
         "https://api.cerebras.ai/v1",
-        "llama-3.3-70b",
+        "zai-glm-4.7",
     )
     test_gemini(os.getenv("GEMINI_API_KEY", "").strip())
     test_openai_compat(

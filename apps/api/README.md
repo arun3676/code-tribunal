@@ -45,12 +45,34 @@ uvicorn code_council.server:app --reload --port 8000
 
 Or from repo root: `docker compose up api`
 
+## CLI
+
+The `tribunal` CLI wraps the same engine for terminals, CI, and coding agents:
+
+```bash
+tribunal verify --ticket ticket.md --diff change.diff   # full court (exit 0=APPROVE, 1=BLOCK)
+tribunal verify --ticket ticket.md --git --quiet         # diff HEAD; exit-code only, for agent loops
+tribunal ghost  --ticket ticket.md --git                 # fast omission pre-check
+tribunal drift  --ticket ticket.md --git                 # fast scope-drift pre-check
+tribunal init hermes                                      # print the MCP wiring block for an agent
+```
+
+`tribunal init <openclaw|hermes|claude|codex|cursor>` emits a ready-to-paste MCP config block
+(`--key` bakes in a real `GROQ_API_KEY`; `--write` writes it to the agent's config path without
+clobbering an existing file). `--quiet` suppresses human output so agents can rely on the exit code.
+
+## Agent integrations
+
+Wiring config + a Hermes Open Skill for OpenClaw and Hermes live in [`integrations/`](../../integrations/);
+the samples there are the verbatim output of `tribunal init` (a test keeps them in sync).
+
 ## Package layout
 
 ```
 code_council/
 ├── server.py
-├── cli.py             # `tribunal` CLI (verify / ghost / drift)
+├── cli.py             # `tribunal` CLI (verify / ghost / drift / init)
+├── agent_config.py    # MCP wiring blocks for `tribunal init` (single source of truth)
 ├── mcp_server.py      # `tribunal-mcp` MCP server
 ├── analyzer.py
 ├── scanners/

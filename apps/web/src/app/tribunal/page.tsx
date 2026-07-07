@@ -5,10 +5,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   getTribunalFixtures,
+  reviewPr,
   tribunal,
+  tribunalVerdict,
   type AgentName,
   type TribunalEvent,
   type TribunalFixture,
+  type TribunalVerdictResult,
   type Verdict,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -88,6 +91,12 @@ export default function TribunalPage() {
   const [bandMode, setBandMode] = useState<"live" | "demo">("demo");
   const [error, setError] = useState<string | null>(null);
   const [rulingExpanded, setRulingExpanded] = useState(false);
+
+  // Mobile-only flow controls (desktop chamber ignores these).
+  const [mobileMode, setMobileMode] = useState<"case" | "paste" | "pr">("case");
+  const [quickVerdict, setQuickVerdict] = useState(false);
+  const [prUrl, setPrUrl] = useState("");
+  const [shareCopied, setShareCopied] = useState(false);
 
   const seq = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -181,6 +190,80 @@ export default function TribunalPage() {
     }
   }
 
+  /** Replay a one-shot result's transcript through the same renderer the SSE path uses. */
+  function applyResult(result: TribunalVerdictResult) {
+    for (const ev of result.transcript ?? []) {
+      handleEvent(ev);
+    }
+    setBandMode(result.band_mode ?? "demo");
+    setVerdict(result.verdict);
+    markSpoken("ARBITER");
+  }
+
+  /** One-shot verdict (no SSE) — used for Paste + "Quick verdict" on mobile. */
+  async function conveneQuick() {
+    if (running) return;
+    reset();
+    setRunning(true);
+    const payload = fixtureId
+      ? { fixture_id: fixtureId }
+      : { ticket, diff, touched_domains: domains, title: "Ad-hoc tribunal" };
+    try {
+      applyResult(await tribunalVerdict(payload));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRunning(false);
+      setCurrent(null);
+    }
+  }
+
+  /** PR URL → one-shot verdict. */
+  async function conveneFromPr() {
+    if (running || !prUrl.trim()) return;
+    reset();
+    setRunning(true);
+    try {
+      applyResult(await reviewPr(prUrl.trim()));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRunning(false);
+      setCurrent(null);
+    }
+  }
+
+  /** Mobile "Run" — routes to the right path based on the selected mode. */
+  function runMobile() {
+    if (mobileMode === "pr") return conveneFromPr();
+    if (mobileMode === "paste" && quickVerdict) return conveneQuick();
+    return convene();
+  }
+
+  async function shareVerdict() {
+    if (!verdict) return;
+    const summary =
+      `Code Tribunal verdict: ${verdict.state} · ${verdict.merge_decision}\n` +
+      `Trust score: ${verdict.trust_score}/100\n` +
+      `${verdict.summary}`;
+    const data = { title: "Code Tribunal verdict", text: summary };
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share(data);
+        return;
+      }
+    } catch {
+      // user dismissed or share failed — fall through to clipboard
+    }
+    try {
+      await navigator.clipboard?.writeText(summary);
+      setShareCopied(true);
+      window.setTimeout(() => setShareCopied(false), 2000);
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
+
   function handleEvent(ev: TribunalEvent) {
     switch (ev.type) {
       case "phase": {
@@ -224,20 +307,20 @@ export default function TribunalPage() {
   const rosterOrdered = useMemo(() => TRIAL_ORDER.filter((a) => roster.includes(a)), [roster]);
 
   return (
-    <div className="flex h-full flex-col gap-3">
+    <div className="flex min-h-full flex-col gap-3 lg:h-full">
       {/* Header */}
       <div className="brutal shrink-0 flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
-        <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl border-[2.5px] border-[color:var(--ink)] bg-[color:var(--arbiter)]">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-[2.5px] border-[color:var(--ink)] bg-[color:var(--arbiter)]">
             <ScalesIcon size={20} color="var(--ink)" />
           </span>
-          <div>
-            <h1 className="font-mono text-base font-bold tracking-[0.16em] text-fg sm:text-lg">TRIBUNAL · WAR ROOM</h1>
+          <div className="min-w-0">
+            <h1 className="font-mono text-base font-bold tracking-[0.12em] text-fg sm:text-lg sm:tracking-[0.16em]">TRIBUNAL · WAR ROOM</h1>
             <p className="text-xs font-medium text-fg-muted">Did the AI build what you actually asked for?</p>
           </div>
         </div>
         <span
-          className="rounded-full border-2 border-[color:var(--ink)] px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--ink)]"
+          className="shrink-0 whitespace-nowrap rounded-full border-2 border-[color:var(--ink)] px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--ink)]"
           style={{ background: bandMode === "live" ? "var(--surveyor)" : "var(--bg-elevated)" }}
         >
           Band · {bandMode === "live" ? "LIVE" : "DEMO"}
@@ -247,9 +330,41 @@ export default function TribunalPage() {
       {/* Plain-language explainer — compact single row */}
       <HowItWorks />
 
-      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[330px_minmax(0,1fr)_360px]">
+      {/* ===== MOBILE (< lg): vertical run → watch → verdict flow ===== */}
+      <MobileTribunal
+        fixtures={fixtures}
+        fixtureId={fixtureId}
+        selectFixture={selectFixture}
+        ticket={ticket}
+        setTicket={setTicket}
+        diff={diff}
+        setDiff={setDiff}
+        clearFixture={() => setFixtureId("")}
+        domains={domains}
+        mode={mobileMode}
+        setMode={setMobileMode}
+        quickVerdict={quickVerdict}
+        setQuickVerdict={setQuickVerdict}
+        prUrl={prUrl}
+        setPrUrl={setPrUrl}
+        running={running}
+        run={runMobile}
+        reset={reset}
+        turns={turns}
+        current={current}
+        roster={rosterOrdered}
+        spoken={spoken}
+        verdict={verdict}
+        bandMode={bandMode}
+        error={error}
+        shareVerdict={shareVerdict}
+        shareCopied={shareCopied}
+      />
+
+      {/* ===== DESKTOP (lg+): the original 3-column chamber, unchanged ===== */}
+      <div className="hidden min-h-0 flex-1 gap-3 lg:grid lg:grid-cols-[330px_minmax(0,1fr)_360px]">
         {/* LEFT — Docket */}
-        <section className="glass flex min-h-0 flex-col overflow-y-auto rounded-2xl p-4">
+        <section className="glass flex min-h-0 flex-col gap-3 overflow-y-auto rounded-2xl p-4">
           <SectionTitle icon={<EvidenceTagIcon size={16} color="var(--advocate)" />} label="Docket" />
 
           <label className="block">
@@ -353,7 +468,7 @@ export default function TribunalPage() {
                     className={cn("flex cursor-help flex-col items-center gap-1 transition-opacity", has ? "opacity-100" : "opacity-40")}
                   >
                     <AgentAvatar agent={agent} size={40} active={current === agent} />
-                    <span className="font-mono text-[9px] font-bold tracking-wider text-fg">{agent}</span>
+                    <span className="font-mono text-[10px] font-bold tracking-wider text-fg">{agent}</span>
                   </div>
                 );
               })}
@@ -364,10 +479,10 @@ export default function TribunalPage() {
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" style={{ background: "var(--ink)" }} />
                   <span className="relative inline-flex h-2.5 w-2.5 rounded-full border border-[color:var(--ink)]" style={{ background: PERSONAS[current].color }} />
                 </span>
-                <span className="font-mono text-xs font-bold tracking-wider">
+                <span className="shrink-0 font-mono text-xs font-bold tracking-wider">
                   {current} · {PERSONAS[current].nickname}
                 </span>
-                <span className="truncate text-xs font-medium italic opacity-80">{PERSONAS[current].tagline}</span>
+                <span className="min-w-0 truncate text-xs font-medium italic opacity-80">{PERSONAS[current].tagline}</span>
               </div>
             ) : null}
           </div>
@@ -397,11 +512,13 @@ export default function TribunalPage() {
                     className="chamber-open rounded-xl border-[2.5px] border-[color:var(--ink)] p-3 text-[color:var(--ink)]"
                     style={{ background: "color-mix(in srgb, var(--warden) 30%, #ffffff)", boxShadow: "var(--shadow-ink-sm)" }}
                   >
-                    <div className="flex items-center gap-3">
-                      <AgentAvatar agent="WARDEN" size={48} active />
-                      <div>
+                    <div className="flex items-start gap-3">
+                      <span className="shrink-0">
+                        <AgentAvatar agent="WARDEN" size={48} active />
+                      </span>
+                      <div className="min-w-0 flex-1">
                         <span className="inline-block rounded border-2 border-[color:var(--ink)] bg-[color:var(--warden)] px-2 py-1 font-mono text-[11px] font-bold uppercase tracking-[0.16em]">⚖ Witness summoned · WARDEN</span>
-                        <p className="mt-1.5 text-sm font-medium">{turn.text}</p>
+                        <p className="mt-1.5 break-words text-sm font-medium">{turn.text}</p>
                       </div>
                     </div>
                   </div>
@@ -421,6 +538,7 @@ export default function TribunalPage() {
               <button
                 onClick={() => setRulingExpanded(true)}
                 title="Expand the full ruling"
+                aria-label="Expand the full ruling"
                 className="btn-tactile rounded-lg border-2 border-[color:var(--ink)] bg-[color:var(--bg-elevated)] px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--ink)]"
               >
                 ⤢ Expand
@@ -448,7 +566,7 @@ export default function TribunalPage() {
               {TRIAL_ORDER.map((agent) => (
                 <div key={agent} className="flex items-center justify-between gap-2 text-[10px]">
                   <span className="flex items-center gap-1.5 font-mono font-bold tracking-wider text-fg">
-                    <span className="h-2.5 w-2.5 rounded-full border border-[color:var(--ink)]" style={{ background: PERSONAS[agent].color }} />
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full border border-[color:var(--ink)]" style={{ background: PERSONAS[agent].color }} />
                     {agent}
                   </span>
                   <span className="font-mono font-semibold uppercase tracking-wider text-fg-muted">{PERSONAS[agent].provider}</span>
@@ -466,10 +584,13 @@ export default function TribunalPage() {
           onClick={() => setRulingExpanded(false)}
         >
           <div
-            className="glass relative my-auto flex max-h-[92vh] w-full max-w-2xl flex-col gap-4 overflow-y-auto rounded-2xl border-2 border-[color:var(--ink)] p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Tribunal ruling — full record"
+            className="glass relative my-auto flex max-h-[92vh] w-full max-w-2xl flex-col gap-4 overflow-y-auto rounded-2xl border-2 border-[color:var(--ink)] p-4 sm:p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="sticky -top-6 z-10 -mx-6 -mt-6 flex items-center justify-between gap-2 border-b-2 border-[color:var(--ink)] bg-[color:var(--bg-overlay)] px-6 py-3">
+            <div className="sticky -top-4 z-10 -mx-4 -mt-4 flex items-center justify-between gap-2 border-b-2 border-[color:var(--ink)] bg-[color:var(--bg-overlay)] px-4 py-3 sm:-top-6 sm:-mx-6 sm:-mt-6 sm:px-6">
               <SectionTitle icon={<GavelIcon size={16} color="var(--ink)" />} label="Ruling — Full Record" />
               <button
                 onClick={() => setRulingExpanded(false)}
@@ -503,9 +624,9 @@ function RulingDetails({ verdict, expanded = false }: { verdict: Verdict; expand
               <span>100</span>
             </div>
             {verdict.deductions.map((d, i) => (
-              <div key={i} className="flex justify-between text-danger">
-                <span className={cn("pr-2", expanded ? "" : "truncate")}>{d.reason}</span>
-                <span>{d.points}</span>
+              <div key={i} className="flex justify-between gap-2 text-danger">
+                <span className={cn("min-w-0 pr-2", expanded ? "break-words" : "truncate")}>{d.reason}</span>
+                <span className="shrink-0">{d.points}</span>
               </div>
             ))}
             <div className="flex justify-between border-t-2 border-[color:var(--ink)] pt-1 font-bold text-fg">
@@ -522,13 +643,26 @@ function RulingDetails({ verdict, expanded = false }: { verdict: Verdict; expand
       {verdict.ledger.length ? (
         <div>
           <p className="mb-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-fg-muted">Traceability ledger</p>
-          <div className="overflow-hidden rounded-lg border-2 border-[color:var(--ink)]">
+          {/* Mobile (< md): stacked cards — readable without horizontal scroll. */}
+          <div className="space-y-2 md:hidden">
+            {verdict.ledger.map((row, i) => (
+              <div key={i} className="rounded-lg border-2 border-[color:var(--ink)] bg-[color:var(--bg-overlay)] p-2.5 font-mono text-[10px]">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 break-words font-bold text-fg">{row.requirement_id}</span>
+                  <LedgerBadge decision={row.decision} />
+                </div>
+                <p className="mt-1 break-words leading-snug text-fg-muted">{row.requirement}</p>
+              </div>
+            ))}
+          </div>
+          {/* Tablet/desktop (md+): the wide table — overflow-x guard for safety. */}
+          <div className="hidden overflow-x-auto rounded-lg border-2 border-[color:var(--ink)] md:block">
             <table className="w-full text-left font-mono text-[10px]">
               <tbody>
                 {verdict.ledger.map((row, i) => (
                   <tr key={i} className="border-b border-[color:var(--ink)] border-opacity-20 last:border-0">
-                    <td className="px-2 py-1.5 align-top font-bold text-fg">{row.requirement_id}</td>
-                    <td className="px-2 py-1.5 align-top text-fg-muted">{row.requirement}</td>
+                    <td className="whitespace-nowrap px-2 py-1.5 align-top font-bold text-fg">{row.requirement_id}</td>
+                    <td className="break-words px-2 py-1.5 align-top text-fg-muted">{row.requirement}</td>
                     <td className="px-2 py-1.5 align-top">
                       <LedgerBadge decision={row.decision} />
                     </td>
@@ -546,16 +680,16 @@ function RulingDetails({ verdict, expanded = false }: { verdict: Verdict; expand
           <div className="space-y-2">
             {verdict.ledger.map((row, i) => (
               <div key={i} className="rounded-lg border-2 border-[color:var(--ink)] bg-[color:var(--bg-elevated)] p-2.5">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-[11px] font-bold text-fg">{row.requirement_id}</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="min-w-0 break-words font-mono text-[11px] font-bold text-fg">{row.requirement_id}</span>
                   <LedgerBadge decision={row.decision} />
                 </div>
-                <p className="mt-1 text-[11px] text-fg-muted">{row.requirement}</p>
-                {row.notes ? <p className="mt-1 text-[11px] italic text-muted">{row.notes}</p> : null}
+                <p className="mt-1 break-words text-[11px] text-fg-muted">{row.requirement}</p>
+                {row.notes ? <p className="mt-1 break-words text-[11px] italic text-muted">{row.notes}</p> : null}
                 {row.code_refs.length ? (
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
                     {row.code_refs.map((ref, j) => (
-                      <span key={j} className="rounded-sm border border-[color:var(--ink)] bg-[color:var(--bg-overlay)] px-1.5 py-0.5 font-mono text-[10px] text-fg-muted">
+                      <span key={j} className="break-all rounded-sm border border-[color:var(--ink)] bg-[color:var(--bg-overlay)] px-1.5 py-0.5 font-mono text-[10px] text-fg-muted">
                         {ref}
                       </span>
                     ))}
@@ -570,6 +704,314 @@ function RulingDetails({ verdict, expanded = false }: { verdict: Verdict; expand
   );
 }
 
+type MobileMode = "case" | "paste" | "pr";
+
+type MobileTribunalProps = {
+  fixtures: TribunalFixture[];
+  fixtureId: string;
+  selectFixture: (fx: TribunalFixture) => void;
+  ticket: string;
+  setTicket: (v: string) => void;
+  diff: string;
+  setDiff: (v: string) => void;
+  clearFixture: () => void;
+  domains: string[];
+  mode: MobileMode;
+  setMode: (m: MobileMode) => void;
+  quickVerdict: boolean;
+  setQuickVerdict: (v: boolean) => void;
+  prUrl: string;
+  setPrUrl: (v: string) => void;
+  running: boolean;
+  run: () => void;
+  reset: () => void;
+  turns: Turn[];
+  current: AgentName | null;
+  roster: AgentName[];
+  spoken: Set<AgentName>;
+  verdict: Verdict | null;
+  bandMode: "live" | "demo";
+  error: string | null;
+  shareVerdict: () => void;
+  shareCopied: boolean;
+};
+
+/**
+ * Mobile-only control/viewer: a single vertical column with three stages —
+ * Start → Deliberation → Verdict. Reuses the in-file MessageLane / EvidenceChip /
+ * RulingDetails helpers and the shared tribunal/* components; only the chrome is
+ * mobile-tuned. Rendered under `lg:hidden`; the desktop chamber is untouched.
+ */
+function MobileTribunal(props: MobileTribunalProps) {
+  const {
+    fixtures, fixtureId, selectFixture, ticket, setTicket, diff, setDiff, clearFixture, domains,
+    mode, setMode, quickVerdict, setQuickVerdict, prUrl, setPrUrl,
+    running, run, reset, turns, current, roster, spoken, verdict, bandMode, error, shareVerdict, shareCopied,
+  } = props;
+
+  // Which stage to emphasise. Stages stay mounted (vertical scroll) but we
+  // surface the relevant one based on run state.
+  const started = running || turns.length > 0 || verdict !== null;
+
+  const canRun =
+    mode === "pr" ? Boolean(prUrl.trim()) : Boolean(ticket.trim() && diff.trim());
+
+  const MODES: { id: MobileMode; label: string }[] = [
+    { id: "case", label: "Case" },
+    { id: "paste", label: "Paste" },
+    { id: "pr", label: "PR URL" },
+  ];
+
+  return (
+    <div className="flex flex-col gap-3 lg:hidden">
+      {/* ── Stage 1 · Start ─────────────────────────────────────────── */}
+      <section className="glass rounded-2xl p-4">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <SectionTitle icon={<EvidenceTagIcon size={16} color="var(--advocate)" />} label="Start a case" />
+          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-dim">Step 1 of 3</span>
+        </div>
+
+        {/* Segmented control */}
+        <div className="grid grid-cols-3 gap-1 rounded-xl border-2 border-[color:var(--ink)] bg-[color:var(--bg-overlay)] p-1">
+          {MODES.map((m) => (
+            <button
+              key={m.id}
+              onClick={() => setMode(m.id)}
+              disabled={running}
+              aria-pressed={mode === m.id}
+              className={cn(
+                "flex min-h-[40px] items-center justify-center rounded-lg border-2 px-1 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.12em] transition-colors disabled:opacity-50",
+                mode === m.id
+                  ? "border-[color:var(--ink)] bg-[color:var(--arbiter)] text-[color:var(--ink)]"
+                  : "border-transparent text-fg-muted",
+              )}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-3 space-y-3">
+          {mode === "case" ? (
+            <div className="space-y-2">
+              <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-dim">Tap a demo case</span>
+              {fixtures.length === 0 ? (
+                <p className="text-[11px] text-muted">Loading cases…</p>
+              ) : (
+                fixtures.map((fx) => {
+                  const selected = fx.id === fixtureId;
+                  return (
+                    <button
+                      key={fx.id}
+                      onClick={() => selectFixture(fx)}
+                      disabled={running}
+                      className={cn(
+                        "btn-tactile w-full rounded-xl border-2 border-[color:var(--ink)] px-3 py-2.5 text-left disabled:opacity-50",
+                        selected ? "bg-[color:var(--arbiter)]" : "bg-[color:var(--bg-elevated)]",
+                      )}
+                    >
+                      <span className="block break-words font-mono text-xs font-bold tracking-wider text-[color:var(--ink)]">{fx.title}</span>
+                      <span className="mt-0.5 line-clamp-2 block break-words text-[11px] leading-snug text-[color:var(--ink)] opacity-70">
+                        {fx.ticket.trim().split("\n")[0]}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          ) : null}
+
+          {mode === "paste" ? (
+            <>
+              <label className="block">
+                <span className="mb-1 block font-mono text-[10px] uppercase tracking-[0.18em] text-dim">Ticket · intent</span>
+                <textarea
+                  value={ticket}
+                  onChange={(e) => {
+                    setTicket(e.target.value);
+                    clearFixture();
+                  }}
+                  rows={4}
+                  placeholder="What did you ask the AI to build?"
+                  className="w-full resize-y rounded-lg border-2 border-[color:var(--ink)] bg-[color:var(--bg-elevated)] px-3 py-2 font-mono text-xs leading-relaxed"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block font-mono text-[10px] uppercase tracking-[0.18em] text-dim">Unified diff</span>
+                <textarea
+                  value={diff}
+                  onChange={(e) => {
+                    setDiff(e.target.value);
+                    clearFixture();
+                  }}
+                  rows={8}
+                  placeholder="Paste the unified diff the AI produced…"
+                  spellCheck={false}
+                  className="w-full resize-y rounded-lg border-2 border-[color:var(--ink)] bg-[color:var(--bg-elevated)] px-3 py-2 font-mono text-[11px] leading-relaxed"
+                />
+              </label>
+              <label className="flex items-center justify-between gap-3 rounded-lg border-2 border-[color:var(--ink)] bg-[color:var(--bg-overlay)] px-3 py-2.5">
+                <span>
+                  <span className="block font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-fg">Quick verdict</span>
+                  <span className="block text-[10px] leading-snug text-muted">Skip the live stream — one reliable result (best on mobile data).</span>
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={quickVerdict}
+                  aria-label="Quick verdict — skip the live stream"
+                  onClick={() => setQuickVerdict(!quickVerdict)}
+                  className={cn(
+                    "relative h-7 w-12 shrink-0 rounded-full border-2 border-[color:var(--ink)] transition-colors",
+                    quickVerdict ? "bg-[color:var(--accent)]" : "bg-[color:var(--bg-elevated)]",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "absolute top-0.5 h-5 w-5 rounded-full border-2 border-[color:var(--ink)] bg-white transition-all",
+                      quickVerdict ? "left-[22px]" : "left-0.5",
+                    )}
+                  />
+                </button>
+              </label>
+            </>
+          ) : null}
+
+          {mode === "pr" ? (
+            <label className="block">
+              <span className="mb-1 block font-mono text-[10px] uppercase tracking-[0.18em] text-dim">GitHub PR URL</span>
+              <input
+                type="url"
+                inputMode="url"
+                value={prUrl}
+                onChange={(e) => setPrUrl(e.target.value)}
+                placeholder="https://github.com/owner/repo/pull/123"
+                className="w-full rounded-lg border-2 border-[color:var(--ink)] bg-[color:var(--bg-elevated)] px-3 py-2.5 font-mono text-xs"
+              />
+              <span className="mt-1 block text-[10px] leading-snug text-muted">Public PRs work without a token. The court fetches the diff + title and returns a one-shot verdict.</span>
+            </label>
+          ) : null}
+
+          {domains.length > 0 && mode !== "pr" ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-dim">Domains</span>
+              {domains.map((d) => (
+                <span
+                  key={d}
+                  className="rounded-full border-2 border-[color:var(--ink)] px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-[color:var(--ink)]"
+                  style={{ background: d === "auth" || d === "security" ? "var(--warden)" : "var(--bg-elevated)" }}
+                >
+                  {d}
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={run}
+              disabled={running || !canRun}
+              className="btn-tactile flex-1 border-[2.5px] border-[color:var(--ink)] bg-[color:var(--arbiter)] px-3 py-3 font-mono text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--ink)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {running ? "Deliberating…" : mode === "pr" ? "⚖ Review PR" : "⚖ Convene Tribunal"}
+            </button>
+            {started ? (
+              <button
+                onClick={reset}
+                disabled={running}
+                className="btn-tactile border-[2.5px] border-[color:var(--ink)] bg-[color:var(--bg-elevated)] px-4 py-3 font-mono text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--ink)] disabled:opacity-40"
+              >
+                Reset
+              </button>
+            ) : null}
+          </div>
+          {error ? <p className="font-mono text-[11px] text-danger">{error}</p> : null}
+        </div>
+      </section>
+
+      {/* ── Stage 2 · Deliberation (vertical timeline) ──────────────── */}
+      {started ? (
+        <section className="glass rounded-2xl p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <SectionTitle icon={<GavelIcon size={16} color="var(--clerk)" />} label="Deliberation" />
+            <span
+              className="shrink-0 whitespace-nowrap rounded-full border-2 border-[color:var(--ink)] px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--ink)]"
+              style={{ background: bandMode === "live" ? "var(--surveyor)" : "var(--bg-elevated)" }}
+            >
+              {bandMode === "live" ? "LIVE" : "DEMO"}
+            </span>
+          </div>
+
+          {/* Roster strip — horizontal scroll on narrow screens so all 7 stay visible */}
+          <div className="mb-3 flex gap-3 overflow-x-auto border-b-2 border-[color:var(--ink)] pb-3">
+            {roster.map((agent) => {
+              const has = spoken.has(agent);
+              return (
+                <div key={agent} className={cn("flex shrink-0 flex-col items-center gap-0.5 transition-opacity", has ? "opacity-100" : "opacity-40")}>
+                  <AgentAvatar agent={agent} size={34} active={current === agent} />
+                  <span className="font-mono text-[10px] font-bold tracking-wider text-fg">{agent}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {turns.length === 0 ? (
+            <div className="flex items-center gap-2 py-4">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[color:var(--accent)] opacity-75" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[color:var(--accent)]" />
+              </span>
+              <p className="text-xs text-muted">{running ? "The chamber is convening…" : "No transcript yet."}</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {turns.map((turn) =>
+                turn.kind === "recruitment" ? (
+                  <div
+                    key={turn.id}
+                    className="chamber-open rounded-xl border-2 border-[color:var(--ink)] p-3 text-[color:var(--ink)]"
+                    style={{ background: "color-mix(in srgb, var(--warden) 30%, #ffffff)", boxShadow: "var(--shadow-ink-sm)" }}
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <span className="shrink-0">
+                        <AgentAvatar agent="WARDEN" size={40} active />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <span className="inline-block rounded border-2 border-[color:var(--ink)] bg-[color:var(--warden)] px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em]">⚖ Witness · WARDEN</span>
+                        <p className="mt-1 break-words text-xs font-medium">{turn.text}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <MessageLane key={turn.id} turn={turn} />
+                ),
+              )}
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {/* ── Stage 3 · Verdict ───────────────────────────────────────── */}
+      {verdict ? (
+        <section className="glass rounded-2xl p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <SectionTitle icon={<GavelIcon size={16} color="var(--ink)" />} label="Verdict" />
+            <button
+              onClick={shareVerdict}
+              className="btn-tactile rounded-lg border-2 border-[color:var(--ink)] bg-[color:var(--bg-elevated)] px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--ink)]"
+            >
+              {shareCopied ? "Copied ✓" : "Share verdict"}
+            </button>
+          </div>
+          <div className="flex flex-col gap-4">
+            <RulingDetails verdict={verdict} />
+          </div>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
 function HowItWorks() {
   const steps = [
     { n: 1, icon: <EvidenceTagIcon size={14} color="var(--advocate)" />, title: "Drop the brief", body: "Paste the ticket you gave the AI, plus the diff it produced." },
@@ -578,13 +1020,13 @@ function HowItWorks() {
   ];
   return (
     <div className="glass shrink-0 rounded-2xl px-4 py-2">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4">
         {steps.map((s, i) => (
-          <div key={s.n} className="flex flex-1 items-center gap-2">
+          <div key={s.n} className="flex min-w-0 flex-1 items-center gap-2">
             <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-hot font-mono text-[10px] font-bold text-accent">{s.n}</span>
-            <div className="flex items-center gap-1.5">
-              {s.icon}
-              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-fg">{s.title}</span>
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="shrink-0">{s.icon}</span>
+              <span className="truncate font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-fg">{s.title}</span>
               <span className="hidden text-[10px] leading-snug text-muted xl:block">— {s.body}</span>
             </div>
             {i < steps.length - 1 ? <span className="shrink-0 text-dim">→</span> : null}
@@ -618,15 +1060,15 @@ env = { GROQ_API_KEY = "<your-key>" }`;
       </p>
       <div className="space-y-2">
         <div>
-          <p className="mb-1 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-fg-dim">Claude Code · Cursor</p>
+          <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-fg-dim">Claude Code · Cursor</p>
           <pre className="overflow-x-auto rounded-lg border-2 border-[color:var(--ink)] bg-[color:var(--bg-overlay)] px-2.5 py-2 font-mono text-[10px] leading-relaxed text-fg">{mcpSnippet}</pre>
         </div>
         <div>
-          <p className="mb-1 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-fg-dim">Codex · ~/.codex/config.toml</p>
+          <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-fg-dim">Codex · ~/.codex/config.toml</p>
           <pre className="overflow-x-auto rounded-lg border-2 border-[color:var(--ink)] bg-[color:var(--bg-overlay)] px-2.5 py-2 font-mono text-[10px] leading-relaxed text-fg">{codexSnippet}</pre>
         </div>
         <div>
-          <p className="mb-1 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-fg-dim">CLI · gate a PR in CI</p>
+          <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-fg-dim">CLI · gate a PR in CI</p>
           <pre className="overflow-x-auto rounded-lg border-2 border-[color:var(--ink)] bg-[color:var(--bg-overlay)] px-2.5 py-2 font-mono text-[10px] leading-relaxed text-fg">{cliSnippet}</pre>
         </div>
       </div>
@@ -648,14 +1090,16 @@ function MessageLane({ turn }: { turn: Turn }) {
   return (
     <div className="lane-in rounded-xl border-2 border-[color:var(--ink)] bg-[color:var(--bg-elevated)] p-4" style={{ borderLeftWidth: "7px", borderLeftColor: persona.color }}>
       <div className="flex items-start gap-3">
-        <AgentAvatar agent={turn.agent} size={44} />
+        <span className="shrink-0">
+          <AgentAvatar agent={turn.agent} size={44} />
+        </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <span className="font-mono text-sm font-bold tracking-wider text-fg">{turn.agent}</span>
             <span className="text-xs font-semibold italic text-fg-muted">"{persona.nickname}"</span>
             <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-fg-dim">· {persona.role}</span>
           </div>
-          {turn.text ? <p className="mt-1.5 text-sm font-medium leading-relaxed text-fg">{renderMentions(turn.text)}</p> : null}
+          {turn.text ? <p className="mt-1.5 break-words text-sm font-medium leading-relaxed text-fg">{renderMentions(turn.text)}</p> : null}
 
           {turn.target && turn.target.length ? (
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -698,14 +1142,14 @@ function EvidenceChip({ chip }: { chip: Chip }) {
       <span className="mt-0.5 shrink-0">
         <EvidenceTagIcon size={14} color="var(--ink)" />
       </span>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="rounded-sm border border-[color:var(--ink)] px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-[color:var(--ink)]" style={{ background: color }}>
             {chip.label}
           </span>
-          {chip.fileRef ? <span className="font-mono text-[10px] font-semibold text-fg-muted">{chip.fileRef}</span> : null}
+          {chip.fileRef ? <span className="break-all font-mono text-[10px] font-semibold text-fg-muted">{chip.fileRef}</span> : null}
         </div>
-        <p className="mt-0.5 text-xs font-medium leading-snug text-fg">{chip.detail}</p>
+        <p className="mt-0.5 break-words text-xs font-medium leading-snug text-fg">{chip.detail}</p>
       </div>
     </div>
   );
@@ -720,8 +1164,8 @@ function Findings({ title, items, color }: { title: string; items: string[]; col
       <ul className="space-y-1">
         {items.map((item, i) => (
           <li key={i} className="flex gap-1.5 text-[11px] leading-snug text-fg-muted">
-            <span style={{ color }}>›</span>
-            <span>{item}</span>
+            <span className="shrink-0" style={{ color }}>›</span>
+            <span className="min-w-0 break-words">{item}</span>
           </li>
         ))}
       </ul>
@@ -739,7 +1183,7 @@ function LedgerBadge({ decision }: { decision: string }) {
   };
   const color = map[decision] ?? "var(--fg-muted)";
   return (
-    <span className="rounded px-1.5 py-0.5 font-bold tracking-wider" style={{ color, background: `color-mix(in srgb, ${color} 14%, transparent)` }}>
+    <span className="shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 font-bold tracking-wider" style={{ color, background: `color-mix(in srgb, ${color} 14%, transparent)` }}>
       {decision}
     </span>
   );
