@@ -35,6 +35,9 @@ TIMEOUT = 30.0
 
 DEFAULT_CHAIN = "groq,cerebras,gemini"
 
+GEMINI_MODEL_ENV = "GEMINI_MODEL"
+GEMINI_DEFAULT_MODEL = "gemini-3.5-flash"
+
 # provider -> (api key env var, base url, model env var, default model)
 _OPENAI_COMPATIBLE: dict[str, tuple[str, str, str, str]] = {
     "groq": ("GROQ_API_KEY", "https://api.groq.com/openai/v1", "GROQ_MODEL", "llama-3.3-70b-versatile"),
@@ -59,9 +62,32 @@ def resolve_key(provider: str) -> str:
     return os.getenv(env_var, "").strip() if env_var else ""
 
 
-def _chain() -> list[str]:
+def key_env_var(provider: str) -> str:
+    """Env var name holding ``provider``'s key (empty for unknown providers)."""
+
+    return _KEY_ENV.get(provider, "")
+
+
+def resolve_model(provider: str) -> str:
+    """The model a call to ``provider`` would use right now (env override or default)."""
+
+    if provider in _OPENAI_COMPATIBLE:
+        _, _, model_env, default_model = _OPENAI_COMPATIBLE[provider]
+        return os.getenv(model_env, "").strip() or default_model
+    if provider == "gemini":
+        return os.getenv(GEMINI_MODEL_ENV, "").strip() or GEMINI_DEFAULT_MODEL
+    raise ValueError(f"unknown provider: {provider}")
+
+
+def chain() -> list[str]:
+    """The configured provider order (``TRIBUNAL_LLM_PROVIDERS`` or default)."""
+
     raw = os.getenv("TRIBUNAL_LLM_PROVIDERS", DEFAULT_CHAIN)
     return [p.strip().lower() for p in raw.split(",") if p.strip()]
+
+
+# Backwards-compatible private alias (pre-doctor internal name).
+_chain = chain
 
 
 def available_providers() -> list[str]:
@@ -90,9 +116,9 @@ def _extract_json(content: str) -> dict | None:
 
 
 def _call_openai_compatible(provider: str, system: str, user: str, schema: dict, max_tokens: int) -> dict | None:
-    api_key_env, base_url, model_env, default_model = _OPENAI_COMPATIBLE[provider]
+    _api_key_env, base_url, _model_env, _default_model = _OPENAI_COMPATIBLE[provider]
     client = OpenAI(api_key=resolve_key(provider), base_url=base_url, timeout=TIMEOUT)
-    model = os.getenv(model_env, default_model)
+    model = resolve_model(provider)
     messages = [
         {"role": "system", "content": system},
         {"role": "user", "content": user},
@@ -149,7 +175,7 @@ def _call_gemini(system: str, user: str, schema: dict, max_tokens: int) -> dict 
     if _google_genai is None:
         raise RuntimeError("google-genai is not installed")
     client = _google_genai.Client(api_key=resolve_key("gemini"))
-    model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    model_name = resolve_model("gemini")
     prompt = f"{system}\n\n{user}"
     base_config: dict[str, Any] = {
         "response_mime_type": "application/json",
@@ -171,6 +197,53 @@ def _call_gemini(system: str, user: str, schema: dict, max_tokens: int) -> dict 
         )
     text = getattr(response, "text", None) or ""
     return _extract_json(text.strip())
+
+
+def _scrub(detail: str, key: str) -> str:
+    """Remove any accidental echo of the API key from an error message."""
+
+    return detail.replace(key, "[redacted]") if key else detail
+
+
+def ping(provider: str, *, max_tokens: int = 1) -> tuple[bool, str]:
+    """Fire a minimal live completion against ``provider``; ``(ok, detail)``.
+
+    Used by ``tribunal doctor`` to prove a BYO key actually works. Reuses the
+    exact same key/base-url/model resolution as the real reasoning calls, so a
+    PASS here means the tribunal chain will work too. ``detail`` never contains
+    key material.
+    """
+
+    key = resolve_key(provider)
+    if not key:
+        return False, f"no API key configured (set {key_env_var(provider) or provider})"
+    try:
+        model = resolve_model(provider)
+    except ValueError as exc:
+        return False, str(exc)
+    try:
+        if provider in _OPENAI_COMPATIBLE:
+            _key_env, base_url, _model_env, _default = _OPENAI_COMPATIBLE[provider]
+            client = OpenAI(api_key=key, base_url=base_url, timeout=TIMEOUT)
+            client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": "ping"}],
+                max_tokens=max_tokens,
+            )
+        elif provider == "gemini":
+            if _google_genai is None:
+                return False, "google-genai is not installed"
+            gclient = _google_genai.Client(api_key=key)
+            gclient.models.generate_content(
+                model=model,
+                contents="ping",
+                config={"max_output_tokens": max_tokens},
+            )
+        else:
+            return False, f"unknown provider '{provider}'"
+    except Exception as exc:  # noqa: BLE001 - report, never raise, in a health check
+        return False, _scrub(str(exc), key)
+    return True, "live completion OK"
 
 
 def complete_json(

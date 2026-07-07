@@ -8,9 +8,28 @@ import "./globals.css";
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
+const TITLE = "Code Tribunal — Did the code build what the ticket asked for?";
+const DESCRIPTION =
+  "An intent-conformance court for AI-generated code. Seven agents reconcile the ticket against the diff and return a merge verdict with a 0–100 trust score. CLI · MCP · Web.";
+
 export const metadata: Metadata = {
-  title: "Code Council",
-  description: "See how frontier models reason about your code.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+  title: {
+    default: TITLE,
+    template: "%s · Code Tribunal",
+  },
+  description: DESCRIPTION,
+  openGraph: {
+    type: "website",
+    siteName: "Code Tribunal",
+    title: TITLE,
+    description: DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+  },
   applicationName: "Code Tribunal",
   appleWebApp: {
     capable: true,

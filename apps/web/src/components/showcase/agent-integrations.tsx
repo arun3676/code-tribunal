@@ -93,13 +93,17 @@ function CopyBlock({ code, label }: { code: string; label: string }) {
   );
 }
 
-export default function AgentIntegrations() {
+export default function AgentIntegrations({ hideHeading = false }: { hideHeading?: boolean }) {
   return (
     <section className="panel rounded-2xl p-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-fg-muted">Ship it into your agent</div>
-          <h2 className="mt-2 text-2xl font-semibold">Wire the Tribunal into any coding agent.</h2>
+          {!hideHeading && (
+            <>
+              <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-fg-muted">Ship it into your agent</div>
+              <h2 className="mt-2 text-2xl font-semibold">Wire the Tribunal into any coding agent.</h2>
+            </>
+          )}
           <p className="mt-2 max-w-3xl text-sm text-fg-muted">
             The same intent-conformance court that runs in this browser ships as a CLI and an MCP server. Both{" "}
             <span className="font-semibold text-fg">OpenClaw</span> and{" "}

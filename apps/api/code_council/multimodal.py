@@ -27,8 +27,12 @@ class MultiModalAnalyzer:
         return [item.to_dict(available=bool(os.getenv(item.env_var))) for item in self.vision_models]
 
     def analyze(self, image_bytes: bytes, prompt: str | None = None, model_id: str | None = None) -> dict[str, Any]:
-        model_id = model_id or "gemini-2.5-flash"
+        model_id = model_id or "gemini-3.5-flash"
         descriptor = next((item for item in self.vision_models if item.id == model_id), None)
+        if descriptor is None and model_id.startswith("gemini"):
+            # Legacy Gemini ids (e.g. gemini-2.5-flash from older clients) route
+            # to whatever Gemini vision entry the registry currently ships.
+            descriptor = next((item for item in self.vision_models if item.provider == "gemini"), None)
         if descriptor is None:
             raise ValueError(f"Unsupported multimodal model: {model_id}")
         if not os.getenv(descriptor.env_var):

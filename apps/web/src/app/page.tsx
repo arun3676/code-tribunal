@@ -1,13 +1,34 @@
+import { CourtRoster } from "@/components/landing/court-roster";
+import { Hero } from "@/components/landing/hero";
+import { InstallSection } from "@/components/landing/install-section";
+import { LandingFooter } from "@/components/landing/landing-footer";
+import { LandingHeader } from "@/components/landing/landing-header";
+import { MotionRoot } from "@/components/landing/motion-primitives";
+import { Problem } from "@/components/landing/problem";
+import { TrialPipeline } from "@/components/landing/trial-pipeline";
+import { VerdictDemo } from "@/components/landing/verdict-demo";
+
+/*
+ * Landing page — thin server component. MotionRoot (client) provides the
+ * LazyMotion context; each section is a client component that animates itself
+ * and carries its own max-w-6xl px-4 py-16 container, so the page adds no
+ * extra gutters. overflow-x-clip contains the rotated/offset hero exhibits.
+ */
 export default function LandingPage() {
   return (
-    <main className="mx-auto flex min-h-[100dvh] max-w-3xl flex-col items-center justify-center gap-4 px-4 text-center">
-      <p className="font-mono text-xs font-bold uppercase tracking-[0.22em] text-fg-muted">
-        Code Tribunal
-      </p>
-      <h1 className="text-4xl font-bold text-fg">
-        Did the code build what the ticket asked for?
-      </h1>
-      <p className="text-fg-muted">Landing page under construction.</p>
-    </main>
+    <MotionRoot>
+      <div className="overflow-x-clip">
+        <LandingHeader />
+        <main>
+          <Hero />
+          <Problem />
+          <CourtRoster />
+          <TrialPipeline />
+          <VerdictDemo />
+          <InstallSection />
+        </main>
+        <LandingFooter />
+      </div>
+    </MotionRoot>
   );
 }
