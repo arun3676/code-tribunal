@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { buildWaitlistEmail } from "@/lib/waitlist-email";
+
 /*
  * Waitlist registration — self-contained on Vercel so the landing page works
  * without the Python backend deployed. Signups land in a Resend audience once
@@ -41,9 +43,32 @@ export async function POST(request: Request) {
       console.warn(`waitlist: resend rejected signup (status=${response.status})`);
       return NextResponse.json({ error: "signup temporarily unavailable" }, { status: 502 });
     }
+    // Serve the summons. Best-effort: a delivery failure (e.g. no verified
+    // sending domain yet) must never fail the registration itself.
+    await sendSummons(apiKey, email);
     return NextResponse.json({ ok: true, stored: "resend" });
   }
 
   console.log(`waitlist signup (resend not configured yet): ${email}`);
   return NextResponse.json({ ok: true, stored: "log" });
+}
+
+async function sendSummons(apiKey: string, email: string): Promise<void> {
+  // Once a domain is verified in Resend, set WAITLIST_FROM to an address on it
+  // (e.g. "Clerk of the Court <clerk@yourdomain>"). Until then Resend only
+  // delivers from onboarding@resend.dev to the account owner's own address.
+  const from = process.env.WAITLIST_FROM?.trim() || "Code Tribunal <onboarding@resend.dev>";
+  const { subject, html, text } = buildWaitlistEmail(email);
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from, to: [email], subject, html, text }),
+    });
+    if (!res.ok) {
+      console.warn(`waitlist: summons email not sent (status=${res.status}) — verify a domain in Resend`);
+    }
+  } catch (err) {
+    console.warn("waitlist: summons email threw", err);
+  }
 }
