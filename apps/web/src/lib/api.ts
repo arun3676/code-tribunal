@@ -42,6 +42,58 @@ export type StreamEvent = {
   data: any;
 };
 
+// --- Tribunal ---------------------------------------------------------------
+
+export type AgentName = "CLERK" | "ADVOCATE" | "SURVEYOR" | "GHOST" | "DRIFT" | "WARDEN" | "ARBITER";
+
+export type AgentMeta = {
+  name: AgentName;
+  role: string;
+  provider: string;
+  color: string;
+  summary: string;
+  recruited: boolean;
+};
+
+export type TribunalEventType = "phase" | "message" | "event" | "recruitment" | "verdict" | "done" | "error";
+
+export type TribunalEvent = {
+  type: TribunalEventType;
+  agent?: AgentName | null;
+  target?: AgentName[] | null;
+  text: string;
+  payload: Record<string, any>;
+};
+
+export type Verdict = {
+  state: "CONFORMS" | "CONFORMS_WITH_CONDITIONS" | "DOES_NOT_CONFORM";
+  trust_score: number;
+  merge_decision: "APPROVE" | "APPROVE_WITH_CONDITIONS" | "BLOCK";
+  blockers: string[];
+  conditions: string[];
+  ledger: Array<{ requirement_id: string; requirement: string; code_refs: string[]; decision: string; notes: string }>;
+  deductions: Array<{ reason: string; points: number }>;
+  summary: string;
+};
+
+export type TribunalFixture = {
+  id: string;
+  title: string;
+  ticket: string;
+  diff: string;
+  touched_domains: string[];
+};
+
+/** One-shot verdict result returned by POST /tribunal/verdict and /tribunal/review-pr. */
+export type TribunalVerdictResult = {
+  verdict: Verdict;
+  headline: string;
+  recruited: AgentName[];
+  findings: TribunalEvent[];
+  band_mode: "live" | "demo";
+  transcript: TribunalEvent[];
+};
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -57,6 +109,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(await response.text());
   }
   return response.json() as Promise<T>;
+}
+
+export async function joinWaitlist(email: string): Promise<{ ok: boolean }> {
+  // Same-origin Next.js route (app/api/waitlist) — keeps the landing's CTA
+  // working on Vercel without the Python backend deployed.
+  const response = await fetch("/api/waitlist", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+  return response.json() as Promise<{ ok: boolean }>;
 }
 
 async function* streamSse(path: string, payload: unknown, signal?: AbortSignal): AsyncGenerator<StreamEvent> {
@@ -125,6 +192,39 @@ export function council(payload: { code: string; language?: string; models: stri
 
 export function scan(payload: { code: string; language?: string }) {
   return request<ScanResult>("/scan", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function getTribunalFixtures() {
+  return request<TribunalFixture[]>("/tribunal/fixtures", { method: "GET" });
+}
+
+export async function* tribunal(
+  payload: { fixture_id?: string; title?: string; ticket?: string; diff?: string; touched_domains?: string[] },
+  signal?: AbortSignal,
+): AsyncGenerator<TribunalEvent> {
+  for await (const frame of streamSse("/tribunal/run", payload, signal)) {
+    // Each SSE frame's data is a full TribunalEvent (its `type` mirrors the event name).
+    yield frame.data as TribunalEvent;
+  }
+}
+
+/**
+ * One-shot JSON verdict (no SSE). Reliable on flaky mobile networks — the whole
+ * trial runs server-side and returns the final verdict + transcript at once.
+ */
+export function tribunalVerdict(
+  payload: { fixture_id?: string; title?: string; ticket?: string; diff?: string; touched_domains?: string[] },
+) {
+  return request<TribunalVerdictResult>("/tribunal/verdict", { method: "POST", body: JSON.stringify(payload) });
+}
+
+/**
+ * Run the tribunal against a public GitHub PR URL. Same one-shot result shape as
+ * tribunalVerdict(). Backend resolves the PR diff + title, builds a docket, and
+ * runs the court.
+ */
+export function reviewPr(pr_url: string) {
+  return request<TribunalVerdictResult>("/tribunal/review-pr", { method: "POST", body: JSON.stringify({ pr_url }) });
 }
 
 export async function multimodal(payload: { file: File; prompt?: string; model?: string }) {

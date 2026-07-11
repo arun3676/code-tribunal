@@ -10,7 +10,11 @@ const config: Config = {
         overlay: "var(--bg-overlay)",
         border: "var(--border)",
         hot: "var(--border-hot)",
-        fg: "var(--fg)",
+        fg: {
+          DEFAULT: "var(--fg)",
+          muted: "var(--fg-muted)",
+          dim: "var(--fg-dim)",
+        },
         muted: "var(--fg-muted)",
         dim: "var(--fg-dim)",
         accent: "var(--accent)",

@@ -19,9 +19,11 @@ jobs:
       - name: Install backend
         run: |
           python -m pip install --upgrade pip
-          pip install -e .
+          pip install -e .[dev]
       - name: Import check
         run: python -c "from code_council.server import app; print(app.title)"
+      - name: Tests
+        run: python -m pytest -q
 
   web:
     runs-on: ubuntu-latest

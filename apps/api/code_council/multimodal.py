@@ -12,9 +12,11 @@ from .analyzer import MODEL_REGISTRY
 from .prompts import build_multimodal_prompt
 
 try:
-    import google.generativeai as genai
+    from google import genai as _google_genai
+    from google.genai import types as _genai_types
 except ImportError:  # pragma: no cover
-    genai = None
+    _google_genai = None
+    _genai_types = None
 
 
 class MultiModalAnalyzer:
@@ -25,8 +27,12 @@ class MultiModalAnalyzer:
         return [item.to_dict(available=bool(os.getenv(item.env_var))) for item in self.vision_models]
 
     def analyze(self, image_bytes: bytes, prompt: str | None = None, model_id: str | None = None) -> dict[str, Any]:
-        model_id = model_id or "gemini-2.5-flash"
+        model_id = model_id or "gemini-3.5-flash"
         descriptor = next((item for item in self.vision_models if item.id == model_id), None)
+        if descriptor is None and model_id.startswith("gemini"):
+            # Legacy Gemini ids (e.g. gemini-2.5-flash from older clients) route
+            # to whatever Gemini vision entry the registry currently ships.
+            descriptor = next((item for item in self.vision_models if item.provider == "gemini"), None)
         if descriptor is None:
             raise ValueError(f"Unsupported multimodal model: {model_id}")
         if not os.getenv(descriptor.env_var):
@@ -57,14 +63,16 @@ class MultiModalAnalyzer:
         return output.getvalue(), "image/jpeg"
 
     def _analyze_with_gemini(self, model_id: str, image_bytes: bytes, mime_type: str, prompt: str) -> str:
-        if genai is None:
-            raise RuntimeError("google-generativeai is not installed")
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-        model = genai.GenerativeModel(model_id)
-        response = model.generate_content([
-            prompt,
-            {"mime_type": mime_type, "data": image_bytes},
-        ])
+        if _google_genai is None:
+            raise RuntimeError("google-genai is not installed")
+        client = _google_genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        response = client.models.generate_content(
+            model=model_id,
+            contents=[
+                prompt,
+                _genai_types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+            ],
+        )
         text = getattr(response, "text", None)
         if text:
             return text.strip()

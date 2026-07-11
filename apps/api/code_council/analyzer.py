@@ -4,7 +4,7 @@ import os
 import time
 from typing import Any
 
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 from openai import OpenAI
 
 from .fixes import FixSuggestionGenerator
@@ -14,23 +14,61 @@ from .prompts import build_analysis_prompt
 from .utils import parse_llm_response, timer_decorator
 
 try:
-    import google.generativeai as genai
+    from google import genai as _google_genai
 except ImportError:  # pragma: no cover
-    genai = None
+    _google_genai = None
 
 
-load_dotenv()
+load_dotenv(find_dotenv(usecwd=True))
+
+
+_GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+_CEREBRAS_BASE_URL = "https://api.cerebras.ai/v1"
 
 
 MODEL_REGISTRY: tuple[ModelDescriptor, ...] = (
+    # --- Free, OpenAI-compatible providers (council default lineup) ---
     ModelDescriptor(
-        id="gemini-2.5-flash",
+        id="llama-3.3-70b-versatile",
+        provider="groq",
+        display="Llama 3.3 70B",
+        color="#F55036",
+        env_var="GROQ_API_KEY",
+        base_url=_GROQ_BASE_URL,
+    ),
+    ModelDescriptor(
+        id="openai/gpt-oss-120b",
+        provider="groq",
+        display="GPT-OSS 120B",
+        color="#10A37F",
+        env_var="GROQ_API_KEY",
+        base_url=_GROQ_BASE_URL,
+    ),
+    ModelDescriptor(
+        id="zai-glm-4.7",
+        provider="cerebras",
+        display="Cerebras GLM",
+        color="#F58220",
+        env_var="CEREBRAS_API_KEY",
+        base_url=_CEREBRAS_BASE_URL,
+    ),
+    ModelDescriptor(
+        id="gemini-3.5-flash",
         provider="gemini",
-        display="Gemini",
+        display="Gemini 3.5 Flash",
         color="#4285F4",
         env_var="GEMINI_API_KEY",
         vision=True,
     ),
+    ModelDescriptor(
+        id="meta-llama/llama-4-scout-17b-16e-instruct",
+        provider="groq",
+        display="Llama 4 Scout",
+        color="#7C3AED",
+        env_var="GROQ_API_KEY",
+        base_url=_GROQ_BASE_URL,
+    ),
+    # --- Optional legacy providers (only surface when a key is present) ---
     ModelDescriptor(
         id="deepseek-chat",
         provider="deepseek",
@@ -52,7 +90,7 @@ MODEL_REGISTRY: tuple[ModelDescriptor, ...] = (
         provider="kimi",
         display="Kimi",
         color="#9C27B0",
-        env_var="Kimi_API_KEY",
+        env_var="KIMI_API_KEY",
         base_url="https://api.moonshot.ai/v1",
         vision=True,
     ),
@@ -147,14 +185,13 @@ class Analyzer:
         return (response.choices[0].message.content or "").strip()
 
     def _generate_with_gemini(self, descriptor: ModelDescriptor, prompt: str) -> str:
-        if genai is None:
-            raise RuntimeError("google-generativeai is not installed")
+        if _google_genai is None:
+            raise RuntimeError("google-genai is not installed")
         api_key = os.getenv(descriptor.env_var)
         if not api_key:
             raise ValueError(f"API key missing for {descriptor.display}")
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(descriptor.id)
-        response = model.generate_content(prompt)
+        client = _google_genai.Client(api_key=api_key)
+        response = client.models.generate_content(model=descriptor.id, contents=prompt)
         text = getattr(response, "text", None)
         if text:
             return text.strip()
