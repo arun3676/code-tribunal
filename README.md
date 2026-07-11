@@ -2,18 +2,22 @@
 
 **Did the AI build what you actually asked for?**
 
+[![CI](https://github.com/arun3676/code-tribunal/actions/workflows/ci.yml/badge.svg)](https://github.com/arun3676/code-tribunal/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/code-tribunal)](https://pypi.org/project/code-tribunal/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://pypi.org/project/code-tribunal/)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Code Tribunal is an intent-conformance review engine for AI-generated code. Instead of asking one model whether a diff looks correct, Tribunal reconciles the **original ticket** against the **actual implementation** and returns a merge verdict, a 0–100 trust score, and a traceability ledger.
+
+![tribunal verify blocking a non-conforming diff](.github/assets/cli-verify.svg)
 
 It ships three ways:
 
-- **CLI** — `tribunal verify` in any terminal or CI pipeline.
+- **CLI** — `tribunal verify` in any terminal or CI pipeline (exit `0` = APPROVE, `1` = BLOCK).
 - **MCP server** — drop it into Claude Code, Codex, or Cursor so your coding agent can self-check a diff before a human ever sees it.
 - **Web demo** — a live War Room that shows the agents deliberating: [code-council.vercel.app](https://code-council.vercel.app).
 
 A CLERK agent opens the case. ADVOCATE extracts requirements. SURVEYOR inspects the diff. GHOST finds requested work that is missing. DRIFT finds unrequested scope changes. WARDEN is recruited for security-sensitive changes. ARBITER produces the verdict.
-
-[![PyPI](https://img.shields.io/pypi/v/code-tribunal)](https://pypi.org/project/code-tribunal/)
-[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 **Live demo:** [code-council.vercel.app](https://code-council.vercel.app) — landing at `/`, live Tribunal at [`/tribunal`](https://code-council.vercel.app/tribunal), Code Council editor at [`/council`](https://code-council.vercel.app/council).
 
@@ -40,6 +44,25 @@ Three decoupled layers — swapping any one never touches the others:
 - **Reasoning** — the agents think on free, open models (Groq → Cerebras → Gemini fallback chain). Bring your own API keys; the chain skips any provider you haven't configured and falls back to deterministic logic if none are set.
 - **Coordination** — Band runs the room (rooms, participants, `@mention` handoffs, structured events, mid-trial recruitment).
 - **Scoring** — the trust score and traceability ledger are computed by deterministic, explainable math.
+
+```mermaid
+flowchart LR
+    subgraph Faces
+        CLI[tribunal CLI]
+        MCP[tribunal-mcp<br/>MCP server]
+        WEB[War Room<br/>web demo]
+    end
+    subgraph Engine["run_trial engine"]
+        CLERK --> ADVOCATE & SURVEYOR
+        ADVOCATE & SURVEYOR --> GHOST & DRIFT
+        GHOST & DRIFT -.->|security touched| WARDEN
+        GHOST & DRIFT & WARDEN --> ARBITER
+    end
+    CLI & MCP & WEB --> Engine
+    Engine --> R["Reasoning<br/>Groq → Cerebras → Gemini<br/>(BYO keys, deterministic fallback)"]
+    Engine --> C["Coordination<br/>Band rooms & events"]
+    ARBITER --> S["Scoring<br/>deterministic trust score<br/>+ traceability ledger"]
+```
 
 ## Agent roster
 
@@ -162,7 +185,7 @@ Set `BAND_ENABLED=true`, `BAND_STRICT=true`, and agent UUIDs for live mirroring.
 - Ticket requests secure login: endpoint, bcrypt, rate limiting, audit log, tests, no auth middleware change.
 - Diff implements login + bcrypt + audit + tests but **omits rate limiting** (GHOST / R3).
 - Diff **changes auth middleware** without authorization (DRIFT).
-- WARDEN recruited → **DOES_NOT_CONFORM**, Trust Score ~35/100, **BLOCK**.
+- WARDEN recruited → **DOES_NOT_CONFORM**, Trust Score 5/100, **BLOCK**.
 
 **health-check-002** — clean pass case. **payment-refund-003** — heavy BLOCK. **user-profile-004** — clean APPROVE.
 
@@ -172,7 +195,7 @@ Set `BAND_ENABLED=true`, `BAND_STRICT=true`, and agent UUIDs for live mirroring.
 git clone https://github.com/arun3676/code-tribunal.git
 cd code-tribunal
 cp .env.example .env    # add LLM (Groq/Cerebras/Gemini) + Band keys
-python scripts/check_env_keys.py
+python scripts/verify_all_keys.py     # key smoke test (never prints secrets)
 python scripts/verify_band_trial.py   # Band smoke test
 docker compose up --build
 ```

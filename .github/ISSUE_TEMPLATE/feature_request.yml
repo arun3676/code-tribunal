@@ -1,0 +1,27 @@
+name: Feature request
+description: An agent to add, a provider to support, a workflow to improve.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the workflow gap, not just the feature.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      placeholder: e.g. "tribunal verify --base main" to diff against a branch instead of a ref
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which surface?
+      multiple: true
+      options:
+        - CLI
+        - MCP server
+        - Web demo
+        - Engine / scoring
+        - New LLM provider

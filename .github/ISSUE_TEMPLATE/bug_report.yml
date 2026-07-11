@@ -1,0 +1,38 @@
+name: Bug report
+description: Something broke — a wrong verdict, a crash, a dead install path.
+labels: [bug]
+body:
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      options:
+        - CLI (tribunal verify/ghost/drift/doctor/init)
+        - MCP server (tribunal-mcp)
+        - Web demo (code-council.vercel.app)
+        - Python API / engine
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you run, what did you expect, what did you get?
+      placeholder: |
+        1. Ran `tribunal verify --ticket ticket.md --git HEAD`
+        2. Expected APPROVE, got a crash / wrong verdict ...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, `code-tribunal` version, providers configured (never paste keys).
+      placeholder: |
+        Windows 11 / Python 3.11 / code-tribunal 0.3.0
+        Providers: groq only (`tribunal doctor` output welcome — it masks keys)
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / output
+      render: shell

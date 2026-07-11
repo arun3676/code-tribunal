@@ -510,7 +510,7 @@ function TribunalApp() {
                   <SealIcon size={18} color="var(--ink)" />
                   <div className="text-left">
                     <p className="font-mono text-xs font-bold uppercase tracking-[0.18em] text-fg">Meet the chamber</p>
-                    <p className="text-[11px] text-muted">Seven specialists. Hit "Convene Tribunal" and watch them debate your diff.</p>
+                    <p className="text-[11px] text-muted">Seven specialists. Hit &ldquo;Convene Tribunal&rdquo; and watch them debate your diff.</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
@@ -1113,7 +1113,7 @@ function MessageLane({ turn }: { turn: Turn }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <span className="font-mono text-sm font-bold tracking-wider text-fg">{turn.agent}</span>
-            <span className="text-xs font-semibold italic text-fg-muted">"{persona.nickname}"</span>
+            <span className="text-xs font-semibold italic text-fg-muted">&ldquo;{persona.nickname}&rdquo;</span>
             <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-fg-dim">· {persona.role}</span>
           </div>
           {turn.text ? <p className="mt-1.5 break-words text-sm font-medium leading-relaxed text-fg">{renderMentions(turn.text)}</p> : null}

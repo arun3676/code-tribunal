@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import asdict
 from difflib import unified_diff
 
 from .models import FixSuggestion

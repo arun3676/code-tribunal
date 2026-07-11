@@ -27,7 +27,6 @@ from .scanners.performance import PerformanceAnalyzer
 from .scanners.security import SecurityAnalyzer
 from .tribunal.fixtures import get_fixture, list_fixtures
 from .tribunal.headless import build_adhoc_docket, run_trial_collect, summarize_verdict
-from .tribunal.protocol import Docket, IntentSource
 from .tribunal.runner import run_trial
 from .utils import chunk_text_for_sse, get_git_sha, parse_llm_response
 
@@ -297,16 +296,6 @@ async def council(payload: CouncilRequest):
     return EventSourceResponse(event_stream())
 
 
-def _detect_domains(diff: str, declared: list[str]) -> list[str]:
-    domains = set(d.strip().lower() for d in declared if d.strip())
-    text = diff.lower()
-    if any(k in text for k in ("login", "auth", "password", "token", "session")):
-        domains.add("auth")
-    if any(k in text for k in ("bcrypt", "crypto", "secret", "middleware", "permission")):
-        domains.add("security")
-    return sorted(domains)
-
-
 @app.get("/tribunal/fixtures")
 async def tribunal_fixtures() -> list[dict]:
     return list_fixtures()
@@ -321,15 +310,7 @@ async def tribunal_run(payload: TribunalRequest):
     else:
         if not payload.ticket or not payload.diff:
             raise HTTPException(status_code=400, detail="Provide fixture_id, or both ticket and diff.")
-        files = sorted({m for m in re.findall(r"[+]{3}\s+b/(\S+)", payload.diff)})
-        docket = Docket(
-            trial_id=f"adhoc-{int(time.time())}",
-            title=payload.title or "Ad-hoc tribunal",
-            intent_sources=[IntentSource(source_ref="custom", title="Ticket", text=payload.ticket)],
-            diff=payload.diff,
-            touched_files=files,
-            touched_domains=_detect_domains(payload.diff, payload.touched_domains),
-        )
+        docket = build_adhoc_docket(payload.ticket, payload.diff, payload.touched_domains, payload.title)
 
     async def event_stream() -> AsyncIterator[dict[str, str]]:
         try:
