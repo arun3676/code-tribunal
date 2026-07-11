@@ -7,6 +7,7 @@ import os
 import re
 import time
 from collections import defaultdict, deque
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
 
@@ -17,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
+from . import __version__
 from .analyzer import Analyzer
 from .fixes import FixSuggestionGenerator
 from .github_webhook import router as github_router, parse_pr_url, _fetch_pr_diff, fetch_pr_meta
@@ -32,7 +34,16 @@ from .utils import chunk_text_for_sse, get_git_sha, parse_llm_response
 logger = logging.getLogger("code_council")
 logging.basicConfig(level=logging.INFO)
 
-app = FastAPI(title="Code Council API", version="0.1.0")
+
+@asynccontextmanager
+async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
+    for descriptor in analyzer.get_model_registry():
+        available = bool(os.getenv(descriptor.env_var))
+        logger.info("provider=%s model=%s available=%s", descriptor.provider, descriptor.id, available)
+    yield
+
+
+app = FastAPI(title="Code Council API", version=__version__, lifespan=_lifespan)
 app.include_router(github_router)
 
 
@@ -101,13 +112,6 @@ class TribunalRequest(BaseModel):
 
 class WaitlistRequest(BaseModel):
     email: str = Field(min_length=3, max_length=254)
-
-
-@app.on_event("startup")
-async def startup_event() -> None:
-    for descriptor in analyzer.get_model_registry():
-        available = bool(os.getenv(descriptor.env_var))
-        logger.info("provider=%s model=%s available=%s", descriptor.provider, descriptor.id, available)
 
 
 _RATE_EXEMPT_PATHS = {"/health", "/models"}
