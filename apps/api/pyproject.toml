@@ -53,5 +53,8 @@ dev = [
 where = ["."]
 include = ["code_council*"]
 
+[tool.setuptools.package-data]
+code_council = ["py.typed"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

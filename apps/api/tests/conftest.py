@@ -16,7 +16,7 @@ _PROVIDER_KEYS = (
     "GEMINI_API_KEY",
     "DEEPSEEK_API_KEY",
     "MERCURY_API_KEY",
-    "Kimi_API_KEY",
+    "KIMI_API_KEY",
 )
 
 
