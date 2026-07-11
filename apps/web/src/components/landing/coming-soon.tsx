@@ -2,8 +2,9 @@ import Link from "next/link";
 
 /**
  * Coming-soon gate for the live product surfaces (/council, /tribunal) while
- * the backend is not yet deployed. Flip NEXT_PUBLIC_DEMO_ENABLED="true" in the
- * Vercel env to reveal the real pages — no code change or redeploy of source.
+ * the backend is not yet deployed. To reveal the real pages, set
+ * NEXT_PUBLIC_DEMO_ENABLED="true" in the Vercel env AND redeploy — NEXT_PUBLIC_
+ * values are inlined at build time, so an env flip alone changes nothing.
  */
 export function ComingSoon({ title, blurb }: { title: string; blurb: string }) {
   return (

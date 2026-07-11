@@ -1,8 +1,8 @@
 import Link from "next/link";
 
 export const metadata = {
-  title: "About · Code Council",
-  description: "Why Code Council exists and how it differs from PR-bot tools.",
+  title: "About",
+  description: "Why Code Tribunal exists and how it differs from PR-bot tools.",
 };
 
 export default function AboutPage() {

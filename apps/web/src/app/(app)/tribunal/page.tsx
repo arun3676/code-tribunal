@@ -16,6 +16,7 @@ import {
   type Verdict,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 import { AgentAvatar } from "@/components/tribunal/agent-avatar";
 import { AgentCard } from "@/components/tribunal/agent-card";
 import { PERSONAS, TRIAL_ORDER } from "@/components/tribunal/personas";
@@ -104,6 +105,7 @@ function TribunalApp() {
   const [bandMode, setBandMode] = useState<"live" | "demo">("demo");
   const [error, setError] = useState<string | null>(null);
   const [rulingExpanded, setRulingExpanded] = useState(false);
+  const rulingDialogRef = useFocusTrap<HTMLDivElement>(rulingExpanded && verdict !== null);
 
   // Mobile-only flow controls (desktop chamber ignores these).
   const [mobileMode, setMobileMode] = useState<"case" | "paste" | "pr">("case");
@@ -597,9 +599,11 @@ function TribunalApp() {
           onClick={() => setRulingExpanded(false)}
         >
           <div
+            ref={rulingDialogRef}
             role="dialog"
             aria-modal="true"
             aria-label="Tribunal ruling — full record"
+            tabIndex={-1}
             className="glass relative my-auto flex max-h-[92vh] w-full max-w-2xl flex-col gap-4 overflow-y-auto rounded-2xl border-2 border-[color:var(--ink)] p-4 sm:p-6"
             onClick={(e) => e.stopPropagation()}
           >

@@ -20,9 +20,11 @@ export function Waitlist() {
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (state === "sending") return;
+    // Honeypot: uncontrolled hidden field — bots autofill it, humans never see it.
+    const honeypot = String(new FormData(event.currentTarget).get("website") ?? "");
     setState("sending");
     try {
-      await joinWaitlist(email.trim());
+      await joinWaitlist(email.trim(), honeypot.trim());
       setState("done");
     } catch {
       setState("error");
@@ -79,6 +81,16 @@ export function Waitlist() {
                 </m.div>
               ) : (
                 <form onSubmit={onSubmit} className="flex min-w-0 flex-col gap-3">
+                  {/* Honeypot — visually hidden and skipped by keyboard/screen readers. */}
+                  <input
+                    type="text"
+                    name="website"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    aria-hidden="true"
+                    className="absolute -left-[9999px] h-px w-px opacity-0"
+                    defaultValue=""
+                  />
                   <label
                     htmlFor="waitlist-email"
                     className="font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-fg-muted"

@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { analyze, council, getModels, multimodal, scan, type ModelInfo, type ScanResult } from "@/lib/api";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 import AgentIntegrations from "@/components/showcase/agent-integrations";
 import MobileLanding from "@/components/showcase/mobile-landing";
 import { ComingSoon, DEMO_ENABLED } from "@/components/landing/coming-soon";
@@ -137,6 +138,7 @@ function CouncilApp() {
   const [imageResult, setImageResult] = useState<{ analysis: string; code_extracted: string; suggestions: string[]; model: string } | null>(null);
   const [imageLoading, setImageLoading] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const shortcutsDialogRef = useFocusTrap<HTMLDivElement>(showShortcuts);
   const soloAbortRef = useRef<AbortController | null>(null);
   const councilAbortRef = useRef<AbortController | null>(null);
   const completedCouncilModelsRef = useRef<Set<string>>(new Set());
@@ -881,7 +883,12 @@ function CouncilApp() {
           className="fixed inset-0 z-30 flex items-center justify-center bg-black/65 px-4"
           onClick={() => setShowShortcuts(false)}
         >
-          <div className="panel w-full max-w-xl rounded-2xl p-5" onClick={(event) => event.stopPropagation()}>
+          <div
+            ref={shortcutsDialogRef}
+            tabIndex={-1}
+            className="panel w-full max-w-xl rounded-2xl p-5"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="flex items-center justify-between gap-3">
               <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-fg-muted">man shortcuts</div>
               <button
