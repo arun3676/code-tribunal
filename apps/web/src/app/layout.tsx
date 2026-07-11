@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/react";
 import { Geist, JetBrains_Mono } from "next/font/google";
 
 import { ServiceWorkerRegister } from "@/components/pwa/sw-register";
+import { SITE_URL } from "@/lib/site";
 
 import "./globals.css";
 
@@ -13,10 +15,8 @@ const DESCRIPTION =
   "An intent-conformance court for AI-generated code. Seven agents reconcile the ticket against the diff and return a merge verdict with a 0–100 trust score. CLI · MCP · Web.";
 
 export const metadata: Metadata = {
-  // Absolute base for OG/twitter image URLs. Defaults to the Vercel production
-  // domain so LinkedIn previews resolve without any env var; override with
-  // NEXT_PUBLIC_SITE_URL once a custom domain is attached.
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://code-council.vercel.app"),
+  // Absolute base for OG/twitter image URLs — see SITE_URL in lib/site.ts.
+  metadataBase: new URL(SITE_URL),
   title: {
     default: TITLE,
     template: "%s · Code Tribunal",
@@ -58,6 +58,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className={`${geist.variable} ${mono.variable}`}>
         {children}
         <ServiceWorkerRegister />
+        <Analytics />
       </body>
     </html>
   );

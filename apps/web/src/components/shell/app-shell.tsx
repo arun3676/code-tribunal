@@ -7,6 +7,7 @@ import { PropsWithChildren, useEffect, useMemo, useState } from "react";
 import { Home, LayoutGrid, Scale, Info } from "lucide-react";
 
 import { getHealth, getModels, type ModelInfo } from "@/lib/api";
+import { DEMO_ENABLED } from "@/components/landing/coming-soon";
 
 const NAV_TABS = [
   { href: "/", label: "Home", Icon: Home },
@@ -22,15 +23,39 @@ export function AppShell({ children }: PropsWithChildren) {
   const pathname = usePathname();
 
   useEffect(() => {
+    // No backend polling while the demo pages are gated — the ComingSoon
+    // screens (and /about) would otherwise hammer a dead NEXT_PUBLIC_API_URL.
+    if (!DEMO_ENABLED) return;
     getModels().then(setModels).catch(() => setModels([]));
+    let failures = 0;
+    let timer = 0;
+    let cancelled = false;
+    const schedule = () => {
+      // Back off from 5s to 30s once the backend looks down.
+      timer = window.setTimeout(checkHealth, failures >= 3 ? 30000 : 5000);
+    };
     const checkHealth = () => {
+      if (cancelled) return;
+      if (document.hidden) {
+        schedule();
+        return;
+      }
       getHealth()
-        .then(() => setOnline(true))
-        .catch(() => setOnline(false));
+        .then(() => {
+          failures = 0;
+          setOnline(true);
+        })
+        .catch(() => {
+          failures += 1;
+          setOnline(false);
+        })
+        .finally(schedule);
     };
     checkHealth();
-    const interval = window.setInterval(checkHealth, 5000);
-    return () => window.clearInterval(interval);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, []);
 
   // Council page broadcasts run progress ("council: 2/4 responding") here.

@@ -111,13 +111,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function joinWaitlist(email: string): Promise<{ ok: boolean }> {
+export async function joinWaitlist(email: string, website = ""): Promise<{ ok: boolean }> {
   // Same-origin Next.js route (app/api/waitlist) — keeps the landing's CTA
-  // working on Vercel without the Python backend deployed.
+  // working on Vercel without the Python backend deployed. `website` is the
+  // honeypot field: humans leave it empty.
   const response = await fetch("/api/waitlist", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, website }),
     cache: "no-store",
   });
   if (!response.ok) {
