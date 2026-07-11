@@ -73,7 +73,7 @@ ALLOWED_ORIGIN_REGEX=https://.*\.vercel\.app
 ### Pre-deploy smoke test (local)
 
 ```bash
-python scripts/check_env_keys.py
+python scripts/verify_all_keys.py
 python scripts/verify_band_trial.py
 ```
 

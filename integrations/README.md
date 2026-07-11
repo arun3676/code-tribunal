@@ -49,4 +49,4 @@ per provider plus a live 1-token PASS/FAIL, and never prints the keys themselves
 - [`hermes/`](hermes/) — autonomous agent (Nous Research), MCP + an [Open Skill](hermes/skill/SKILL.md).
 
 For the full design rationale (why MCP is the spine, and what a deeper native integration
-would look like), see `docs/explainers/agent-integrations.html`.
+would look like), see the [Architecture section of the main README](../README.md#architecture).

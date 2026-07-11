@@ -1,5 +1,9 @@
 # Code Tribunal API
 
+**Did the AI build what you actually asked for?** Intent-conformance review for
+AI-generated code: reconcile the original ticket against the diff and get a merge
+verdict, a 0–100 trust score, and a traceability ledger.
+
 FastAPI backend for [Code Tribunal](https://github.com/arun3676/code-tribunal). Also ships a
 CLI (`tribunal`) and an MCP server (`tribunal-mcp`) over the same engine — see the
 [root README](https://github.com/arun3676/code-tribunal#readme) and the
@@ -10,6 +14,8 @@ CLI (`tribunal`) and an MCP server (`tribunal-mcp`) over the same engine — see
 uvx --from code-tribunal tribunal --help       # CLI, no install
 uvx --from code-tribunal tribunal-mcp          # MCP server, no install
 ```
+
+![tribunal verify blocking a non-conforming diff](https://raw.githubusercontent.com/arun3676/code-tribunal/main/.github/assets/cli-verify.svg)
 
 ## Endpoints
 

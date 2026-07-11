@@ -12,7 +12,6 @@ from code_council.tribunal.protocol import Finding, RequirementItem
 from code_council.tribunal.runner import (
     adjudicate,
     detect_signals,
-    ghost_omissions,
     is_met,
 )
 from code_council.tribunal.headless import build_adhoc_docket, run_trial_collect
