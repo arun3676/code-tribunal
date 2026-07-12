@@ -11,7 +11,7 @@ from .fixes import FixSuggestionGenerator
 from .language import LanguageDetector
 from .models import CodeAnalysisResult, ModelDescriptor
 from .prompts import build_analysis_prompt
-from .utils import parse_llm_response, timer_decorator
+from ..utils import parse_llm_response, timer_decorator
 
 try:
     from google import genai as _google_genai

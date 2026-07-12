@@ -4,7 +4,7 @@ Ships three faces over one trial engine: the ``tribunal`` CLI, the
 ``tribunal-mcp`` MCP server, and the FastAPI backend behind the web demo.
 """
 
-from .analyzer import Analyzer
+from .council import Analyzer
 
 __version__ = "0.3.0"
 
