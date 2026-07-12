@@ -19,12 +19,12 @@ from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 from . import __version__
-from .analyzer import Analyzer
-from .fixes import FixSuggestionGenerator
+from .council.analyzer import Analyzer
+from .council.fixes import FixSuggestionGenerator
 from .github_webhook import router as github_router, parse_pr_url, _fetch_pr_diff, fetch_pr_meta
-from .multimodal import MultiModalAnalyzer
-from .scanners.performance import PerformanceAnalyzer
-from .scanners.security import SecurityAnalyzer
+from .council.multimodal import MultiModalAnalyzer
+from .council.scanners.performance import PerformanceAnalyzer
+from .council.scanners.security import SecurityAnalyzer
 from .tribunal.fixtures import get_fixture, list_fixtures
 from .tribunal.headless import build_adhoc_docket, run_trial_collect, summarize_verdict
 from .tribunal.runner import run_trial

@@ -115,23 +115,33 @@ the samples there are the verbatim output of `tribunal init` (a test keeps them 
 
 ## Package layout
 
+Two engines, one server. `tribunal/` is the flagship intent-conformance court;
+`council/` is the older multi-model analysis engine behind the `/council` editor.
+They share no code — only `server.py` mounts both.
+
 ```
 code_council/
-├── server.py
-├── cli.py             # `tribunal` CLI (verify / ghost / drift / init / doctor)
-├── agent_config.py    # MCP wiring blocks for `tribunal init` (single source of truth)
-├── mcp_server.py      # `tribunal-mcp` MCP server
-├── analyzer.py
-├── scanners/
-├── multimodal.py
-├── github.py          # GitHub diff fetching (powers /tribunal/review-pr + webhook)
-└── tribunal/
-    ├── protocol.py      # Pydantic schemas + AGENTS roster
-    ├── fixtures.py      # auth-login-001, health-check-002, payment-refund-003, user-profile-004
-    ├── llm.py           # reasoning layer: Groq → Cerebras → Gemini fallback
-    ├── runner.py        # staged trial: LLM agents + deterministic fallback
-    ├── coordination.py  # CoordinationBackend seam (Band today, swappable)
-    └── band_adapter.py
+├── server.py           # FastAPI: mounts both engines (SSE + JSON)
+├── cli.py              # `tribunal` CLI (verify / ghost / drift / init / doctor)
+├── mcp_server.py       # `tribunal-mcp` MCP server (stdio)
+├── agent_config.py     # MCP wiring blocks for `tribunal init` (single source of truth)
+├── github_webhook.py   # PR diff fetching (powers /tribunal/review-pr + the webhook)
+├── utils.py            # shared helpers (SSE chunking, git sha, LLM response parsing)
+│
+├── tribunal/           # ── the court (flagship engine) ──
+│   ├── protocol.py     # Pydantic schemas + AGENTS roster — the contract with the UI
+│   ├── fixtures.py     # auth-login-001, health-check-002, payment-refund-003, user-profile-004
+│   ├── llm.py          # reasoning layer: Groq → Cerebras → Gemini fallback chain
+│   ├── runner.py       # the staged trial + deterministic scorer (adjudicate)
+│   ├── headless.py     # non-streaming entrypoints shared by CLI / MCP / API / webhook
+│   ├── coordination.py # CoordinationBackend seam (Band today, swappable)
+│   └── band_adapter.py
+│
+└── council/            # ── multi-model analysis engine (the /council editor) ──
+    ├── analyzer.py     # model registry + streaming analysis
+    ├── multimodal.py   # vision-model image analysis
+    ├── fixes.py, prompts.py, language.py, models.py
+    └── scanners/       # static security + performance rules
 ```
 
 ## Tribunal env vars

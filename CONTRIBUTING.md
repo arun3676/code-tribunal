@@ -4,11 +4,15 @@ Thanks for your interest! Issues and PRs are welcome.
 
 ## Repo layout
 
-- `apps/api` — Python package (`code-tribunal` on PyPI): the tribunal engine,
-  `tribunal` CLI, `tribunal-mcp` MCP server, and the FastAPI backend.
+- `apps/api` — Python package (`code-tribunal`): the delivery surfaces
+  (`server.py`, `cli.py`, `mcp_server.py`) over two independent engines —
+  `code_council/tribunal/` (the intent-conformance court) and
+  `code_council/council/` (the older multi-model analysis engine). They share no
+  code; only the FastAPI server mounts both.
 - `apps/web` — Next.js landing page + War Room demo.
 - `integrations/` — MCP wiring guides for coding agents (kept in sync with
   `tribunal init` — see `apps/api/tests/test_init.py`).
+- `scripts/` — operational smoke tests (key checks, Band trial, Railway env).
 
 ## Dev setup
 
