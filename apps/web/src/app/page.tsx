@@ -8,7 +8,7 @@ import { Problem } from "@/components/landing/problem";
 import { TrialPipeline } from "@/components/landing/trial-pipeline";
 import { VerdictDemo } from "@/components/landing/verdict-demo";
 import { Waitlist } from "@/components/landing/waitlist";
-import { GITHUB_URL, PYPI_URL, SITE_URL } from "@/lib/site";
+import { GITHUB_URL, SITE_URL } from "@/lib/site";
 
 /*
  * Landing page — thin server component. MotionRoot (client) provides the
@@ -27,7 +27,8 @@ const JSON_LD = {
   applicationCategory: "DeveloperApplication",
   operatingSystem: "Windows, macOS, Linux",
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-  sameAs: [GITHUB_URL, PYPI_URL],
+  // PYPI_URL stays out of sameAs until the package is actually published.
+  sameAs: [GITHUB_URL],
 };
 
 export default function LandingPage() {

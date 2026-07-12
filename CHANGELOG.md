@@ -6,7 +6,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.3.0] - 2026-07-11
 
-First public release on PyPI as [`code-tribunal`](https://pypi.org/project/code-tribunal/).
+Release-ready cut of the `code-tribunal` package. Install from the repo until the
+PyPI release lands:
+`uvx --from "git+https://github.com/arun3676/code-tribunal.git#subdirectory=apps/api" tribunal --help`
 
 ### Added
 - **CLI** — `tribunal verify` (full court, exit 0/1 for CI), `tribunal ghost`
