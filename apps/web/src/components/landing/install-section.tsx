@@ -9,7 +9,10 @@ import { useCopyToClipboard } from "@/lib/use-copy";
  * existing AgentIntegrations showcase (which carries its own copy blocks).
  */
 
-const INSTALL_CMD = "uvx --from code-tribunal tribunal-mcp";
+// Until the PyPI release lands, install straight from the repo — this command
+// works today. Swap the git URL for `code-tribunal` once the package is published.
+const INSTALL_CMD =
+  'uvx --from "git+https://github.com/arun3676/code-tribunal.git#subdirectory=apps/api" tribunal-mcp';
 
 function HeadlineCommand() {
   const { copied, copy } = useCopyToClipboard();
@@ -30,7 +33,10 @@ function HeadlineCommand() {
         </button>
       </div>
       <p className="mt-3 text-[13px] leading-snug text-fg-muted">
-        One command. Works in Claude Code, Cursor, Codex, OpenClaw, Hermes — bring your own free Groq/Cerebras/Gemini keys.
+        One command, works today — straight from the repo, no clone. Runs in Claude Code, Cursor,
+        Codex, OpenClaw, Hermes; bring your own free Groq/Cerebras/Gemini keys. The short{" "}
+        <code className="font-mono text-[12px] text-fg">uvx --from code-tribunal</code> form lands
+        with the PyPI release.
       </p>
     </div>
   );
@@ -43,15 +49,16 @@ export function InstallSection() {
         <div className="flex flex-wrap items-center gap-2">
           <div className="font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-fg-muted">Ship It Into Your Agent</div>
           <span className="rounded-full border-2 border-[color:var(--ink)] bg-[color:var(--accent-soft)] px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-[color:var(--ink)]">
-            Coming soon
+            Free · BYO keys
           </span>
         </div>
         <h2 id="install-heading" className="mt-2 max-w-2xl text-2xl font-semibold leading-tight sm:text-3xl">
           The court travels. Install it where your agent works.
         </h2>
         <p className="mt-2 max-w-2xl text-sm text-fg-muted">
-          Here&apos;s how the CLI and MCP server will wire into any coding agent. Publishing
-          alongside the hosted court — <a href="#waitlist" className="font-semibold text-fg underline underline-offset-2">join the waitlist</a> to get the install the day it ships.
+          The CLI and MCP server run today, free, with your own keys — install them from the repo
+          below. The PyPI release and the hosted court land together —{" "}
+          <a href="#waitlist" className="font-semibold text-fg underline underline-offset-2">join the waitlist</a> to hear the day they ship.
         </p>
       </Reveal>
 

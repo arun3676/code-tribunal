@@ -5,6 +5,14 @@ ticket actually asked for?" It ships as an MCP server (`tribunal-mcp`), and ever
 is a first-class **MCP client** — so wiring Tribunal in is mostly dropping one server block
 into the agent's config.
 
+> **Not on PyPI yet.** The sample blocks here (and the `tribunal init` output) use the
+> post-release form `--from code-tribunal`. Until the package is published, substitute the
+> git URL — everything else is identical:
+>
+> ```
+> --from "git+https://github.com/arun3676/code-tribunal.git#subdirectory=apps/api"
+> ```
+
 ## The three tools your agent gets
 
 | Tool | Answers | Cost |

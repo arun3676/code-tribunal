@@ -32,11 +32,16 @@ const INTEGRATIONS: Integration[] = [
   "mcpServers": {
     "tribunal": {
       "command": "uvx",
-      "args": ["--from", "code-tribunal", "tribunal-mcp"],
+      "args": [
+        "--from",
+        "git+https://github.com/arun3676/code-tribunal.git#subdirectory=apps/api",
+        "tribunal-mcp"
+      ],
       "env": { "GROQ_API_KEY": "<your-key>" }
     }
   }
 }`,
+    foot: "Shortens to --from code-tribunal once the PyPI release lands",
   },
   {
     tag: "Self-hosted gateway",
@@ -46,7 +51,9 @@ const INTEGRATIONS: Integration[] = [
     codeLabel: "openclaw mcp add",
     code: `openclaw mcp add tribunal \\
   --command uvx \\
-  --arg --from --arg code-tribunal --arg tribunal-mcp`,
+  --arg --from \\
+  --arg "git+https://github.com/arun3676/code-tribunal.git#subdirectory=apps/api" \\
+  --arg tribunal-mcp`,
   },
   {
     tag: "Autonomous agent",

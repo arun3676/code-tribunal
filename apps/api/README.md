@@ -7,12 +7,15 @@ verdict, a 0–100 trust score, and a traceability ledger.
 FastAPI backend for [Code Tribunal](https://github.com/arun3676/code-tribunal). Also ships a
 CLI (`tribunal`) and an MCP server (`tribunal-mcp`) over the same engine — see the
 [root README](https://github.com/arun3676/code-tribunal#readme) and the
-[live demo](https://code-council.vercel.app). Published on PyPI as
-[`code-tribunal`](https://pypi.org/project/code-tribunal/):
+[live demo](https://code-council.vercel.app).
+
+> **Not on PyPI yet** — install from the repo (no clone needed). Once published,
+> `--from code-tribunal` replaces the git URL.
 
 ```bash
-uvx --from code-tribunal tribunal --help       # CLI, no install
-uvx --from code-tribunal tribunal-mcp          # MCP server, no install
+GIT="git+https://github.com/arun3676/code-tribunal.git#subdirectory=apps/api"
+uvx --from "$GIT" tribunal --help       # CLI, no install
+uvx --from "$GIT" tribunal-mcp          # MCP server, no install
 ```
 
 ![tribunal verify blocking a non-conforming diff](https://raw.githubusercontent.com/arun3676/code-tribunal/main/.github/assets/cli-verify.svg)

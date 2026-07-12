@@ -3,8 +3,7 @@
 **Did the AI build what you actually asked for?**
 
 [![CI](https://github.com/arun3676/code-tribunal/actions/workflows/ci.yml/badge.svg)](https://github.com/arun3676/code-tribunal/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/code-tribunal)](https://pypi.org/project/code-tribunal/)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://pypi.org/project/code-tribunal/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Code Tribunal is an intent-conformance review engine for AI-generated code. Instead of asking one model whether a diff looks correct, Tribunal reconciles the **original ticket** against the **actual implementation** and returns a merge verdict, a 0–100 trust score, and a traceability ledger.
@@ -88,16 +87,31 @@ Fallback chain order is `TRIBUNAL_LLM_PROVIDERS=groq,cerebras,gemini`.
 
 ## Install (CLI / MCP)
 
-Published on PyPI as [`code-tribunal`](https://pypi.org/project/code-tribunal/). Run the MCP server with no clone via [`uvx`](https://docs.astral.sh/uv/). Bring your own key in the `env` block.
+> **Not on PyPI yet.** The `code-tribunal` package is release-ready (v0.3.0) but not
+> published, so install straight from this repo with [`uv`](https://docs.astral.sh/uv/) —
+> no clone needed. Once it's on PyPI, `--from code-tribunal` replaces the git URL
+> everywhere below.
 
-**Claude Code / Cursor** (`mcpServers` config):
+```bash
+# CLI, no install
+uvx --from "git+https://github.com/arun3676/code-tribunal.git#subdirectory=apps/api" tribunal --help
+
+# or install it properly
+pip install "git+https://github.com/arun3676/code-tribunal.git#subdirectory=apps/api"
+```
+
+**Claude Code / Cursor** (`mcpServers` config) — bring your own key in the `env` block:
 
 ```jsonc
 {
   "mcpServers": {
     "tribunal": {
       "command": "uvx",
-      "args": ["--from", "code-tribunal", "tribunal-mcp"],
+      "args": [
+        "--from",
+        "git+https://github.com/arun3676/code-tribunal.git#subdirectory=apps/api",
+        "tribunal-mcp"
+      ],
       "env": { "GROQ_API_KEY": "your-key-here" }
     }
   }
@@ -109,7 +123,7 @@ Published on PyPI as [`code-tribunal`](https://pypi.org/project/code-tribunal/).
 ```toml
 [mcp_servers.tribunal]
 command = "uvx"
-args = ["--from", "code-tribunal", "tribunal-mcp"]
+args = ["--from", "git+https://github.com/arun3676/code-tribunal.git#subdirectory=apps/api", "tribunal-mcp"]
 env = { GROQ_API_KEY = "your-key-here" }
 ```
 
@@ -136,6 +150,9 @@ Bake a key into the MCP block (`--key` is an alias for `--groq-key`):
 ```bash
 tribunal init claude --groq-key gsk_...
 ```
+
+`tribunal init` emits the post-PyPI form (`--from code-tribunal`). Until the package is
+published, swap that for the git URL above in the block it prints.
 
 Multi-provider, with the fallback chain and a model override:
 
