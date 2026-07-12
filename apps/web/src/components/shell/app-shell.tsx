@@ -67,8 +67,17 @@ export function AppShell({ children }: PropsWithChildren) {
 
   const availability = useMemo(() => models.filter((model) => model.available), [models]);
 
+  // Only the War Room is a fixed one-screen chamber (its columns scroll
+  // internally). Flowing pages (/council, /about) must use normal document
+  // scroll — locking them clips everything below the first viewport.
+  const lockViewport = pathname.startsWith("/tribunal");
+
   return (
-    <div className="flex min-h-[100dvh] flex-col text-fg md:h-screen md:overflow-hidden">
+    <div
+      className={`flex min-h-[100dvh] flex-col text-fg ${
+        lockViewport ? "md:h-screen md:overflow-hidden" : ""
+      }`}
+    >
       <header className="shrink-0 z-20 border-b-[2.5px] border-[color:var(--ink)] bg-[color:var(--bg-overlay)]">
         <div className="flex h-12 w-full items-center justify-between px-4 md:px-5">
           <div className="flex items-center gap-3">
@@ -128,7 +137,13 @@ export function AppShell({ children }: PropsWithChildren) {
        * md:pb-3 restores normal desktop bottom padding.
        * pt-3 is explicit so py-3 intent is clear (pb-24 overrides pb-3 on mobile).
        */}
-      <main className="min-h-0 flex-1 px-4 pt-3 pb-24 md:overflow-hidden md:pb-3">{children}</main>
+      <main
+        className={`min-h-0 flex-1 px-4 pt-3 pb-24 md:pb-3 ${
+          lockViewport ? "md:overflow-hidden" : ""
+        }`}
+      >
+        {children}
+      </main>
 
       {/* Mobile bottom-tab nav — hidden on md+ */}
       <nav
