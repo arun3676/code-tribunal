@@ -1055,18 +1055,23 @@ function HowItWorks() {
 }
 
 function InstallPanel() {
+  // Git-based install until the PyPI release lands — then the --from arg
+  // shortens to "code-tribunal" (keep in sync with install-section.tsx).
+  const GIT_FROM = "git+https://github.com/arun3676/code-tribunal.git#subdirectory=apps/api";
   const mcpSnippet = `{
   "mcpServers": {
     "tribunal": {
       "command": "uvx",
-      "args": ["--from", "code-tribunal", "tribunal-mcp"],
+      "args": ["--from",
+        "${GIT_FROM}",
+        "tribunal-mcp"],
       "env": { "GROQ_API_KEY": "<your-key>" }
     }
   }
 }`;
   const codexSnippet = `[mcp_servers.tribunal]
 command = "uvx"
-args = ["--from", "code-tribunal", "tribunal-mcp"]
+args = ["--from", "${GIT_FROM}", "tribunal-mcp"]
 env = { GROQ_API_KEY = "<your-key>" }`;
   const cliSnippet = `tribunal verify --ticket ticket.md --diff pr.diff`;
   return (
